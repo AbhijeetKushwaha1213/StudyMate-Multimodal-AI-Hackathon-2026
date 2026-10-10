@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { useToast } from '@/hooks/use-toast';
+import { IS_EXAM_MODE_GATED } from '@/config/featureGates';
 
 export const getAuthRedirectUrl = (path = '/auth/callback') => {
   const envUrl = (
@@ -195,7 +196,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user_id: supabaseUser.id,
         email: email,
         name: userName,
-        user_type: 'exam',
+        user_type: IS_EXAM_MODE_GATED ? 'college' : 'exam',
         study_streak: 0,
         total_study_hours: 0,
         current_level: 1,
@@ -217,7 +218,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user_id: supabaseUser.id,
         name: userName,
         email: email,
-        userType: 'exam',
+        userType: IS_EXAM_MODE_GATED ? 'college' : 'exam',
         study_streak: 0,
         total_study_hours: 0,
         current_level: 1,
@@ -242,7 +243,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user_id: supabaseUser.id,
         name: supabaseUser.user_metadata?.name || email.split('@')[0] || 'User',
         email: email,
-        userType: 'exam',
+        userType: IS_EXAM_MODE_GATED ? 'college' : 'exam',
         study_streak: 0,
         total_study_hours: 0,
         current_level: 1,
@@ -258,7 +259,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user_id: supabaseUser.id,
         name: supabaseUser.user_metadata?.name || email.split('@')[0] || 'User',
         email: email,
-        userType: 'exam',
+        userType: IS_EXAM_MODE_GATED ? 'college' : 'exam',
         study_streak: 0,
         total_study_hours: 0,
         current_level: 1,
@@ -832,6 +833,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const updateUserType = async (type: 'exam' | 'college', details: any) => {
+    // Defense-in-depth: if Exam Mode is gated, safeguard by setting College Mode
+    const effectiveType = (IS_EXAM_MODE_GATED && type === 'exam') ? 'college' : type;
+
     // 1. Immediately create and commit full user profile to local state and cache
     const activeUserId = user?.id || user?.user_id;
     const cleanEmail = details.email || user?.email || '';
@@ -843,14 +847,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user_id: activeUserId || `user-${Date.now()}`,
       name: cleanName,
       email: cleanEmail,
-      userType: type,
+      userType: effectiveType,
       examType: details.examType ?? user?.examType,
       targetYear: details.targetYear ?? (user as any)?.targetYear,
-      college: details.college ?? user?.college ?? (type === 'college' ? 'University' : undefined),
+      college: details.college ?? user?.college ?? (effectiveType === 'college' ? 'University' : undefined),
       university: details.university ?? user?.university,
       degree: details.degree ?? user?.degree,
       academicYear: details.academicYear ?? user?.academicYear,
-      branch: details.course ?? details.branch ?? user?.branch ?? (type === 'college' ? 'General' : undefined),
+      branch: details.course ?? details.branch ?? user?.branch ?? (effectiveType === 'college' ? 'General' : undefined),
       semester: details.semester !== undefined ? details.semester : (user?.semester ?? 1),
       examDate: details.examDate ?? user?.examDate,
       subjects: details.subjects ?? user?.subjects ?? [],
@@ -881,7 +885,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (!session?.user) return;
 
           const updateData: any = {
-            user_type: type,
+            user_type: effectiveType,
             name: cleanName,
             email: session.user.email || cleanEmail,
             updated_at: new Date().toISOString(),
@@ -892,7 +896,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           if (details.age) updateData.age_range = details.age;
 
-          if (type === 'exam') {
+          if (effectiveType === 'exam') {
             if (details.examType) updateData.exam_type = details.examType;
             if (details.examDate) updateData.exam_date = details.examDate;
             if (details.targetYear) updateData.target_year = details.targetYear;

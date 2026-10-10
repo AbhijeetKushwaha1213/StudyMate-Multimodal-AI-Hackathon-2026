@@ -23,6 +23,7 @@ const Landing = lazy(() => import("./pages/Landing"));
 const EvaluationDashboard = lazy(() =>
   import("./components/dev/EvaluationDashboard").then((m) => ({ default: m.EvaluationDashboard })),
 );
+const ExamModeRoute = lazy(() => import("./pages/ExamModeRoute"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -92,6 +93,32 @@ export const App = () => {
                     element={
                       <ProtectedRoute>
                         <MainApp />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Protected Exam Mode Routes (Gated with Coming Soon for Hackathon Demo) */}
+                  <Route
+                    path="/exam"
+                    element={
+                      <ProtectedRoute>
+                        <ExamModeRoute />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/exam-prep"
+                    element={
+                      <ProtectedRoute>
+                        <ExamModeRoute />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/exam-mode"
+                    element={
+                      <ProtectedRoute>
+                        <ExamModeRoute />
                       </ProtectedRoute>
                     }
                   />

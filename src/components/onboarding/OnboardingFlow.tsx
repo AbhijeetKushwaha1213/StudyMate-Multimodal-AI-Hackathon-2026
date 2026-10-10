@@ -28,6 +28,8 @@ import { useNavigate } from 'react-router-dom';
 import { ChooseSubjectsStep } from './ChooseSubjectsStep';
 import { supabase } from '@/integrations/supabase/client';
 import { trackOnboardingCompleted } from '@/api/analyticsAPI';
+import { IS_EXAM_MODE_GATED } from '@/config/featureGates';
+import { ExamModeComingSoon } from '@/components/common/ExamModeComingSoon';
 
 interface OnboardingData {
   name: string;
@@ -60,12 +62,19 @@ const STEPS = [
   'Complete Profile'
 ];
 
-export const OnboardingFlow = () => {
+export const OnboardingFlow = ({
+  initialStep = 0,
+  initialData = {},
+}: {
+  initialStep?: number;
+  initialData?: Partial<OnboardingData>;
+} = {}) => {
   const navigate = useNavigate();
   const { updateUserType, user } = useAuth();
   const { toast } = useToast();
-  const [currentStep, setCurrentStep] = useState(0);
+  const [currentStep, setCurrentStep] = useState(initialStep);
   const [isLoading, setIsLoading] = useState(false);
+  const [showExamComingSoon, setShowExamComingSoon] = useState(false);
   const [data, setData] = useState<OnboardingData>({
     name: '',
     age: '',
@@ -75,7 +84,8 @@ export const OnboardingFlow = () => {
     motivation: [],
     dailyHours: '',
     reviewModes: [],
-    email: user?.email || ''
+    email: user?.email || '',
+    ...initialData,
   });
 
   const examTypes = [
@@ -100,6 +110,10 @@ export const OnboardingFlow = () => {
   ];
 
   const handleNext = () => {
+    if (currentStep === 2 && data.learningMode === 'exam' && IS_EXAM_MODE_GATED) {
+      setShowExamComingSoon(true);
+      return;
+    }
     if (currentStep < STEPS.length - 1) {
       setCurrentStep(currentStep + 1);
     }
@@ -136,7 +150,10 @@ export const OnboardingFlow = () => {
   const handleComplete = async () => {
     setIsLoading(true);
     try {
-      const userType = data.learningMode;
+      // Temporary hackathon gate: ensure College Mode is enforced if exam mode was somehow active
+      const userType = (IS_EXAM_MODE_GATED && data.learningMode === 'exam')
+        ? 'college'
+        : data.learningMode;
       
       // Validate required fields
       if (!userType || !data.name) {
@@ -352,14 +369,31 @@ export const OnboardingFlow = () => {
               </Card>
 
               <Card 
-                className={`p-8 cursor-pointer transition-all duration-300 hover:shadow-xl ${
+                className={`p-8 cursor-pointer transition-all duration-300 hover:shadow-xl relative ${
                   data.learningMode === 'exam' 
                     ? 'border-emerald-500 bg-emerald-500/10 shadow-lg ring-2 ring-emerald-500/30' 
                     : 'hover:border-emerald-400/50 bg-card hover:shadow-lg border-border'
                 }`}
-                onClick={() => setData({...data, learningMode: 'exam'})}
+                onClick={() => {
+                  if (IS_EXAM_MODE_GATED) {
+                    setShowExamComingSoon(true);
+                  } else {
+                    setData({...data, learningMode: 'exam'});
+                  }
+                }}
               >
                 <div className="text-center">
+                  {IS_EXAM_MODE_GATED && (
+                    <div className="flex items-center justify-center gap-1.5 mb-2">
+                      <Badge 
+                        variant="outline" 
+                        className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 text-xs font-semibold uppercase tracking-wider"
+                      >
+                        <Clock className="w-3 h-3 mr-1 inline" />
+                        Coming Soon
+                      </Badge>
+                    </div>
+                  )}
                   <Target className="w-16 h-16 text-emerald-600 dark:text-emerald-400 mx-auto mb-4" />
                   <h3 className="font-bold text-xl mb-3 text-foreground">Exam Preparation</h3>
                   <p className="text-muted-foreground leading-relaxed">Focused preparation for competitive exams like JEE, NEET, UPSC, GATE, and more</p>
@@ -600,6 +634,26 @@ export const OnboardingFlow = () => {
         return null;
     }
   };
+
+  if (showExamComingSoon) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-accent/30 via-background to-accent/20 flex items-center justify-center p-4">
+        <div className="w-full max-w-3xl animate-fade-in-up">
+          <ExamModeComingSoon
+            onGoToCollegeMode={() => {
+              setData(prev => ({ ...prev, learningMode: 'college' }));
+              setShowExamComingSoon(false);
+              setCurrentStep(3);
+            }}
+            onBack={() => {
+              setShowExamComingSoon(false);
+            }}
+            backLabel="Back to mode selection"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-accent/30 via-background to-accent/20 flex items-center justify-center p-4">

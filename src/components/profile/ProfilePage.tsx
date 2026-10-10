@@ -46,6 +46,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useRealtimeStudyActivity, ActivityTimeRange } from '@/hooks/useRealtimeStudyActivity';
+import { IS_EXAM_MODE_GATED } from '@/config/featureGates';
 
 interface ExtendedPreferences {
   preferredSubjects?: string;
@@ -790,11 +791,23 @@ export const ProfilePage = () => {
               <select
                 id="prof-mode"
                 value={userType}
-                onChange={(e) => setUserType(e.target.value as 'college' | 'exam')}
+                onChange={(e) => {
+                  const val = e.target.value as 'college' | 'exam';
+                  if (IS_EXAM_MODE_GATED && val === 'exam') {
+                    toast({
+                      title: "Exam Preparation Mode",
+                      description: "Exam Mode is currently in development and coming soon. College Mode is active.",
+                    });
+                    return;
+                  }
+                  setUserType(val);
+                }}
                 className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="college">College Student</option>
-                <option value="exam">Exam Preparation</option>
+                <option value="exam" disabled={IS_EXAM_MODE_GATED}>
+                  Exam Preparation {IS_EXAM_MODE_GATED ? '(Coming Soon)' : ''}
+                </option>
               </select>
             </div>
 

@@ -15,8 +15,10 @@ import { IntegrationsSettings } from './IntegrationsSettings';
 import { PasswordChangeForm } from './PasswordChangeForm';
 import { supabase } from '@/integrations/supabase/client';
 import { LogOut } from 'lucide-react';
+import { IS_EXAM_MODE_GATED } from '@/config/featureGates';
+import { ExamModeComingSoon } from '@/components/common/ExamModeComingSoon';
 
-export const SettingsPage = () => {
+export const SettingsPage = ({ defaultTab = 'profile' }: { defaultTab?: string }) => {
   const { user, updateUserType, updateUser, signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -24,7 +26,8 @@ export const SettingsPage = () => {
   const [email, setEmail] = useState(user?.email || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [selectedType, setSelectedType] = useState(user?.userType || 'exam');
+  const [showExamComingSoon, setShowExamComingSoon] = useState(false);
+  const [selectedType, setSelectedType] = useState(user?.userType || 'college');
   const [examType, setExamType] = useState(user?.examType || '');
   const [college, setCollege] = useState(user?.college || '');
   const [semester, setSemester] = useState<number | undefined>(user?.semester);
@@ -87,9 +90,16 @@ export const SettingsPage = () => {
   };
 
   const handleStudyPreferenceUpdate = async () => {
+    if (IS_EXAM_MODE_GATED && selectedType === 'exam') {
+      // Validate before persisting: Exam Mode is gated for hackathon demo.
+      // Do not save unsupported mode, do not show false success message.
+      setShowExamComingSoon(true);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      await updateUserType(selectedType, { examType, college, semester });
+      await updateUserType(selectedType as 'exam' | 'college', { examType, college, semester });
       toast({
         title: "Study Preferences Updated",
         description: "Your study preferences have been saved.",
@@ -131,7 +141,7 @@ export const SettingsPage = () => {
         <p className="text-muted-foreground">Manage your account and preferences</p>
       </div>
 
-      <Tabs defaultValue="profile" className="w-full">
+      <Tabs defaultValue={defaultTab} className="w-full">
         <TabsList className="mb-6">
           <TabsTrigger value="profile">Profile</TabsTrigger>
           <TabsTrigger value="study">Study Preferences</TabsTrigger>
@@ -196,73 +206,110 @@ export const SettingsPage = () => {
         </TabsContent>
 
         <TabsContent value="study">
-          <Card className="p-6">
-            <h2 className="text-lg font-semibold text-foreground mb-4">Study Preferences</h2>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="userType">I am a...</Label>
-                <Select value={selectedType} onValueChange={handleUserTypeChange}>
-                  <SelectTrigger id="userType">
-                    <SelectValue placeholder="Select your type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="exam">Exam Aspirant</SelectItem>
-                    <SelectItem value="college">College Student</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {selectedType === 'exam' && (
+          {showExamComingSoon ? (
+            <ExamModeComingSoon
+              onGoToCollegeMode={async () => {
+                setSelectedType('college');
+                setIsSubmitting(true);
+                try {
+                  await updateUserType('college', {
+                    college: college || user?.college || 'College / University',
+                    semester: semester || user?.semester || 1,
+                  });
+                  setShowExamComingSoon(false);
+                  toast({
+                    title: "Study Preferences Updated",
+                    description: "Switched to College Mode. Your preferences have been saved.",
+                  });
+                } catch (error) {
+                  console.error("Failed to restore College Mode in settings:", error);
+                  toast({
+                    title: "Update Failed",
+                    description: "Failed to save College Mode preferences.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              onBack={() => {
+                setSelectedType(user?.userType === 'exam' ? 'college' : (user?.userType || 'college'));
+                setShowExamComingSoon(false);
+              }}
+              backLabel="Back to Settings"
+              isLoading={isSubmitting}
+            />
+          ) : (
+            <Card className="p-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4">Study Preferences</h2>
+              <div className="space-y-4">
                 <div>
-                  <Label htmlFor="examType">Preparing for...</Label>
-                  <Input
-                    type="text"
-                    id="examType"
-                    value={examType}
-                    onChange={(e) => setExamType(e.target.value)}
-                    placeholder="e.g., JEE, NEET, UPSC"
-                  />
+                  <Label htmlFor="userType">I am a...</Label>
+                  <Select value={selectedType} onValueChange={handleUserTypeChange}>
+                    <SelectTrigger id="userType">
+                      <SelectValue placeholder="Select your type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="exam">
+                        Exam Aspirant {IS_EXAM_MODE_GATED ? '(Coming Soon)' : ''}
+                      </SelectItem>
+                      <SelectItem value="college">College Student</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              )}
 
-              {selectedType === 'college' && (
-                <div className="space-y-4">
+                {selectedType === 'exam' && (
                   <div>
-                    <Label htmlFor="collegeName">College Name</Label>
+                    <Label htmlFor="examType">Preparing for...</Label>
                     <Input
                       type="text"
-                      id="collegeName"
-                      value={college}
-                      onChange={(e) => setCollege(e.target.value)}
-                      placeholder="e.g., IIT Bombay"
+                      id="examType"
+                      value={examType}
+                      onChange={(e) => setExamType(e.target.value)}
+                      placeholder="e.g., JEE, NEET, UPSC"
                     />
                   </div>
-                  <div>
-                    <Label htmlFor="semester">Semester</Label>
-                    <Select value={semester?.toString()} onValueChange={(value) => setSemester(parseInt(value))}>
-                      <SelectTrigger id="semester">
-                        <SelectValue placeholder="Select semester" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">Semester 1</SelectItem>
-                        <SelectItem value="2">Semester 2</SelectItem>
-                        <SelectItem value="3">Semester 3</SelectItem>
-                        <SelectItem value="4">Semester 4</SelectItem>
-                        <SelectItem value="5">Semester 5</SelectItem>
-                        <SelectItem value="6">Semester 6</SelectItem>
-                        <SelectItem value="7">Semester 7</SelectItem>
-                        <SelectItem value="8">Semester 8</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
+                )}
 
-              <Button onClick={handleStudyPreferenceUpdate} disabled={isSubmitting}>
-                {isSubmitting ? "Updating..." : "Update Preferences"}
-              </Button>
-            </div>
-          </Card>
+                {selectedType === 'college' && (
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="collegeName">College Name</Label>
+                      <Input
+                        type="text"
+                        id="collegeName"
+                        value={college}
+                        onChange={(e) => setCollege(e.target.value)}
+                        placeholder="e.g., IIT Bombay"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="semester">Semester</Label>
+                      <Select value={semester?.toString()} onValueChange={(value) => setSemester(parseInt(value))}>
+                        <SelectTrigger id="semester">
+                          <SelectValue placeholder="Select semester" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">Semester 1</SelectItem>
+                          <SelectItem value="2">Semester 2</SelectItem>
+                          <SelectItem value="3">Semester 3</SelectItem>
+                          <SelectItem value="4">Semester 4</SelectItem>
+                          <SelectItem value="5">Semester 5</SelectItem>
+                          <SelectItem value="6">Semester 6</SelectItem>
+                          <SelectItem value="7">Semester 7</SelectItem>
+                          <SelectItem value="8">Semester 8</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                <Button onClick={handleStudyPreferenceUpdate} disabled={isSubmitting}>
+                  {isSubmitting ? "Updating..." : "Update Preferences"}
+                </Button>
+              </div>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="notifications">
