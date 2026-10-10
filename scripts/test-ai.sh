@@ -34,7 +34,7 @@ elif [ "$HTTP_STATUS" = "500" ]; then
     echo "❌ Error: Function returned 500"
     echo ""
     echo "Common causes:"
-    echo "1. Gemini API key not set - run: ./deploy-gemini.sh YOUR_KEY"
+    echo "1. Gemini API key not set - run: ./scripts/deploy-gemini.sh YOUR_KEY"
     echo "2. Function not deployed - run: supabase functions deploy ai-assistant"
     echo "3. Invalid API key - check your Gemini API key"
 else

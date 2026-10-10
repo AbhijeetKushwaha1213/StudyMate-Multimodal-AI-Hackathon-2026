@@ -131,6 +131,7 @@ export const BuiltForGoalsSection = () => {
             <span>Ming automatically configures its SM-2 intervals according to your exam deadline.</span>
             <span className="text-[#165034] dark:text-emerald-400 font-semibold">Zero Friction Setup</span>
           </div>
+        </div>
       </div>
     </section>
   );

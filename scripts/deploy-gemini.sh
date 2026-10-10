@@ -8,7 +8,7 @@ echo ""
 if [ -z "$1" ]; then
     echo "❌ Error: Gemini API key not provided"
     echo ""
-    echo "Usage: ./deploy-gemini.sh YOUR_GEMINI_API_KEY"
+    echo "Usage: ./scripts/deploy-gemini.sh YOUR_GEMINI_API_KEY"
     echo ""
     echo "To get a Gemini API key:"
     echo "1. Visit: https://makersuite.google.com/app/apikey"

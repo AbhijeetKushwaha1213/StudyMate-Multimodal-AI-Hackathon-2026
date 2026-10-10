@@ -15,7 +15,7 @@
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
-    "test:rag": "node test-rag-api.ts",
+    "test:rag": "node scripts/test-rag-api.ts",
     "benchmark": "node benchmarks/run-evaluation.ts",
     "loadtest": "node scripts/run-load-benchmark.ts",
     "eval": "node benchmarks/run-evaluation.ts",

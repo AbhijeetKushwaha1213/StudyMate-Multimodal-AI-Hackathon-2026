@@ -222,8 +222,8 @@ All automated gates passed cleanly:
 - `docs/setup/DEMO_SETUP_GUIDE.md` (Deterministic pre-demo checklist and reset guide)
 - `docs/evaluation/EVALUATION_SUMMARY.md` (Scientific evaluation report with statistical explanations)
 - `README.md` (Updated demo links and verified capability roadmap)
-- `PHASE_8_EVALUATION.md` (Reconciled historical BKT parameters with runtime constants)
-- `PHASE_10_FINAL_RELEASE.md` (This comprehensive final release report)
+- [PHASE_8_EVALUATION.md](PHASE_8_EVALUATION.md) (Reconciled historical BKT parameters with runtime constants)
+- [PHASE_10_FINAL_RELEASE.md](PHASE_10_FINAL_RELEASE.md) (This comprehensive final release report)
 
 ---
 

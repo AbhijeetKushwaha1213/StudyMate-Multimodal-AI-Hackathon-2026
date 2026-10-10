@@ -187,72 +187,186 @@ flowchart LR
 ## 🏁 Getting Started
 
 ### Prerequisites
-- **Node.js** v18.0 or higher
-- **npm** or **pnpm**
+- **Node.js** v20.0 or higher (v22/v23 recommended)
+- **npm** v10.0 or higher
+- **Python** v3.11+ (for multimodal PDF/PPTX/video extraction & local RAG)
 - A [Supabase](https://supabase.com/) project and a [Google Gemini API key](https://aistudio.google.com/)
 
-### Installation
+### Installation & Environment Setup
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/AbhijeetKushwaha1213/StudyMate-Multimodal-AI-Hackathon-2026.git
 cd StudyMate-Multimodal-AI-Hackathon-2026
 
-# 2. Install dependencies
+# 2. Install Node dependencies (automatically runs prisma:generate via postinstall)
 npm install
 
-# 3. Set up environment variables
+# 3. Set up environment variables from template
 cp .env.example .env
 ```
 
-Add your keys to `.env`:
+Configure your `.env` following `.env.example`:
 
 ```env
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Client-side variables
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
 VITE_GEMINI_API_KEY=your_gemini_api_key
+
+# Backend runtime variables
+GEMINI_API_KEY=your_gemini_api_key
+DATABASE_URL=file:./prisma/dev.db
+VECTOR_STORE=chroma
 ```
+
+> ⚠️ **Never commit your `.env` file.** Keep credentials and API keys strictly out of version control.
+
+### Local Development Commands
 
 ```bash
-# 4. Start the dev server
+# Start both Node backend API (port 3001) and Vite frontend (port 3000 / 5173) concurrently
 npm run dev
+
+# Start frontend development server only (Vite)
+npm run dev:vite
+
+# Start Node backend API only (with file watch)
+npm run dev:api
+
+# Start backend in standalone production mode
+npm run start:api
 ```
 
-Open **http://localhost:3000** or **http://localhost:5173** 🎉
+Open **http://localhost:3000** or **http://localhost:5173** in your browser 🎉
 
-> ⚠️ **Never commit your `.env` file.** Keep API keys out of version control.
+### Test, Typecheck & Production Build Commands
+
+```bash
+# Run complete Vitest test suite (60 test suites, 985 tests)
+npm test
+
+# Run TypeScript type check across the codebase
+npx tsc --noEmit
+
+# Run ESLint code quality checks
+npm run lint
+
+# Build production bundle (outputs to dist/)
+npm run build
+
+# Preview production build locally
+npm run preview
+
+# Run automated RAG evaluation benchmarks
+npm run eval
+
+# Run 50-client concurrency load benchmark
+npm run loadtest
+```
+
+### Database & Migration Guidance
+
+Ming uses a dual-engine database architecture:
+- **Local Development**: SQLite via `@prisma/adapter-libsql` (`prisma/schema.prisma` -> `prisma/dev.db`) for lightweight zero-config testing.
+- **Production / Staging**: PostgreSQL with `pgvector` (`prisma/schema.postgresql.prisma` and Supabase).
+
+```bash
+# Generate Prisma clients for both schemas
+npm run prisma:generate
+
+# Apply Supabase database migrations (requires Supabase CLI)
+supabase db push
+
+# Apply repair & study materials setup SQL manually if needed:
+# supabase/fix-database.sql
+```
+
+
+---
+
+## 📚 Documentation Directory
+
+Ming contains comprehensive technical documentation organized into distinct domain areas:
+
+| Category | Description | Key Documents |
+| :--- | :--- | :--- |
+| **🏛️ Architecture** | System topology, data flow, design system | [Architecture Overview](docs/architecture/ARCHITECTURE_OVERVIEW.md) • [System Architecture](docs/architecture/ARCHITECTURE.md) • [Design System](docs/architecture/DESIGN_SYSTEM.md) |
+| **🚀 Setup & Guides** | Environment configuration, auth, local run | [Demo Setup Guide](docs/setup/DEMO_SETUP_GUIDE.md) • [Google Auth Setup](docs/setup/SETUP_GOOGLE_AUTH.md) • [Contributing Guide](docs/development/CONTRIBUTING.md) |
+| **📊 Evaluation** | Benchmarks, compliance audits, metrics | [Evaluation Summary (N=147)](docs/evaluation/EVALUATION_SUMMARY.md) • [Compliance Audit](docs/evaluation/TRACK_D_FINAL_COMPLIANCE_AUDIT.md) • [Track D Audit](docs/evaluation/TRACK_D_AUDIT_REPORT.md) • [Educational Analysis](docs/evaluation/COLLEGE_AI_STUDY_COMPANION_ANALYSIS.md) |
+| **🗺️ Roadmap & Phases** | Historical phase completion reports | [Phase 10: Final Release](docs/roadmap/phases/PHASE_10_FINAL_RELEASE.md) • [Phase 9: Product Readiness](docs/roadmap/phases/PHASE_9_PRODUCT_READINESS.md) • [Phase 8: Evaluation](docs/roadmap/phases/PHASE_8_EVALUATION.md) • [All Phases (2-10)](docs/roadmap/phases/) |
+| **🎬 Demo & Pitch** | Live presentation and demo scripts | [Interactive Deck (HTML)](public/pitch.html) • [Pitch Deck (MD)](docs/pitch/PITCH_DECK.md) • [Demo Script](docs/demo/DEMO_SCRIPT.md) • [Sample Materials](docs/demo/sample_materials/) |
+| **🛠️ Development** | Audits, conventions, repository health | [Repository Structure Audit](docs/development/REPOSITORY_STRUCTURE_AUDIT.md) • [Contributing Guide](docs/development/CONTRIBUTING.md) |
 
 ---
 
 ## 📁 Project Structure
 
-<details>
-<summary><b>Click to expand</b></summary>
+<details open>
+<summary><b>Click to toggle project tree</b></summary>
 
-```
-├── api/                    # Server API handlers and SQLite resource management
-├── prisma/                 # Prisma schema and SQLite database migrations
-├── public/                 # Static assets, manifests, icons
-├── server/                 # Express / Node backend server
-├── src/
-│   ├── api/                # Client-side API helpers and test mocks
-│   ├── components/
-│   │   ├── ai/             # Premium AI Generator wizard and components
-│   │   ├── auth/           # Authentication forms and OAuth callbacks
-│   │   ├── chat/           # AI Chat Assistant interface
-│   │   ├── dashboard/      # College & Exam dashboards
-│   │   ├── exam/           # Exam management and mock tests
-│   │   ├── flashcards/     # Flashcard viewer, Quiz runner, Mind maps
-│   │   ├── notion/         # Notion-style block editor and document trees
-│   │   ├── planner/        # Multi-level study planners and timelines
-│   │   ├── projects/       # College project tracking and Focus view
-│   │   ├── resources/      # Resource management space
-│   │   └── ui/             # Radix UI design system primitives
-│   ├── hooks/              # Custom React hooks (AI, offline, stats, audio)
-│   ├── integrations/       # Supabase client and generated types
-│   ├── pages/              # Top-level view routes (Landing, Index, NotFound)
-│   └── services/           # Cache, database sync, and storage services
-└── supabase/               # Supabase migrations and Edge Functions
+```text
+ming/
+├── package.json                   # Dependencies, build & test scripts
+├── .env.example                   # Environment variable template (sanitized)
+├── requirements.txt               # Python dependencies for multimodal processing
+│
+├── docs/                          # Comprehensive technical documentation
+│   ├── architecture/              # Architecture diagrams, data flow & design system
+│   ├── setup/                     # Setup, authentication, and quickstart guides
+│   ├── evaluation/                # Benchmark results, compliance & audit reports
+│   ├── roadmap/phases/            # Historical phase completion reports (Phases 2-10)
+│   ├── demo/                      # Demo script, timeline & sample study materials
+│   ├── pitch/                     # Pitch deck source markdown
+│   └── development/               # Architecture audit and contributing conventions
+│
+├── src/                           # Frontend React 18 / TypeScript application
+│   ├── api/                       # Typed client API callers & test mocks
+│   ├── components/                # Modular UI & domain components
+│   ├── hooks/                     # Custom React hooks
+│   ├── integrations/              # Supabase client & generated database types
+│   ├── pages/                     # Top-level application routes
+│   ├── services/                  # Cache, telemetry, and storage services
+│   ├── test/                      # Vitest unit, integration & security test suites
+│   ├── types/                     # Shared TypeScript interface definitions
+│   └── utils/                     # Formatting, math, and study plan utilities
+│
+├── server/                        # Backend Node.js/TypeScript & Python multimodal runtime
+│   ├── index.ts                   # HTTP server entry point & route gateway
+│   ├── ragHandler.ts              # Ingestion & retrieval orchestration
+│   ├── learnerHandler.ts          # BKT evidence ingestion & mastery API
+│   ├── studyAgentHandler.ts       # AI study loop & personalized intervention API
+│   ├── evaluationHandler.ts       # Evaluation reporting endpoints
+│   ├── videoHandler.ts            # Video transcript & lecture processing
+│   ├── analyticsHandler.ts        # Telemetry ingestion & query handling
+│   ├── rag_engine.py              # Canonical multimodal extraction & hybrid search
+│   └── vector_store_pgvector.py   # PostgreSQL pgvector tenant-scoped vector store
+│
+├── scripts/                       # Development, migration, benchmarking & load harness
+│   ├── dev.ts                     # Concurrently starts Node backend & Vite frontend
+│   ├── run-load-benchmark.ts      # 50-client concurrency & load testing harness
+│   ├── vector_load_worker.py      # In-memory vector embedding worker for load tests
+│   ├── migrate-sqlite-to-postgres.ts # SQLite to PostgreSQL data migration
+│   └── migrate_chroma_to_pgvector.py # ChromaDB to pgvector migration
+│
+├── benchmarks/                    # Evaluation datasets & benchmark runner
+│   ├── data/                      # Multi-modal evaluation questions & learner traces
+│   ├── results/                   # Historical and latest JSON/CSV benchmark runs
+│   └── run-evaluation.ts          # Automated benchmark execution runner
+│
+├── prisma/                        # Database schemas & client generation
+│   ├── schema.prisma              # Local development SQLite schema
+│   ├── schema.postgresql.prisma   # Production PostgreSQL / pgvector schema
+│   └── generated-pg-client/       # Generated PostgreSQL Prisma client (git-ignored)
+│
+├── supabase/                      # Cloud database & Edge Functions
+│   ├── functions/                 # Supabase Edge Functions (ai-assistant)
+│   ├── migrations/                # SQL migrations & RLS policies
+│   └── fix-database.sql           # Database fix & initialization script
+│
+└── public/                        # Static web assets & presentation materials
+    ├── pitch.html                 # Self-contained interactive pitch deck
+    └── assets/                    # Logos, hero images, and branding assets
 ```
 
 </details>

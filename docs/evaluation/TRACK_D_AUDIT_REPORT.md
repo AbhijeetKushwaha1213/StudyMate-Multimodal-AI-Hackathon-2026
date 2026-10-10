@@ -189,7 +189,7 @@ Ming AI was comprehensively implemented and validated against the complete speci
 | Deliverable | Requirement | Current Status | Action Needed |
 | :--- | :--- | :--- | :--- |
 | **Working Software Prototype** | Web/app prototype featuring ingestion, grounded chat, adaptive assessments, dashboard. | **100% Done & Running** (`http://localhost:3000`) | Clean and ready for demonstration. |
-| **Project Documentation** | Documentation of architecture, grounding method, and learner-model approach. | **90% Done** (`COLLEGE_AI_STUDY_COMPANION_ANALYSIS.md` + this report) | Consolidate into final submission README / technical paper. |
+| **Project Documentation** | Documentation of architecture, grounding method, and learner-model approach. | **90% Done** ([COLLEGE_AI_STUDY_COMPANION_ANALYSIS.md](COLLEGE_AI_STUDY_COMPANION_ANALYSIS.md) + this report) | Consolidate into final submission README / technical paper. |
 | **Evaluation & Benchmarking** | Evaluation results of framework metrics & simulated student results on course material. | **100% Done** (`latest_evaluation.csv`, 50 simulated students) | Present graphs/tables directly in pitch deck and video. |
 | **Demonstration Video** | 3-10 minute YouTube video showing ingestion, chat, assessment, architecture. | **Pending Recording** | Record video using the 5-step script outlined below. |
 

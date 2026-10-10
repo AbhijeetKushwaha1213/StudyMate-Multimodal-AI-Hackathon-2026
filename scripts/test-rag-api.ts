@@ -1,4 +1,4 @@
-import { ragHandler } from './server/ragHandler.ts';
+import { ragHandler } from '../server/ragHandler.ts';
 
 function mockRes() {
   let statusCode = 200;

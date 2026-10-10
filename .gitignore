@@ -7,9 +7,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Build outputs and coverage
 node_modules
 dist
 dist-ssr
+coverage/
 *.local
 
 # Environment variables
@@ -17,22 +19,25 @@ dist-ssr
 .env.local
 .env.*.local
 
-
 # Temp, virtualenv, and vector db directories
 .kiro/
 supabase/.temp/
 .venv/
 chroma_data/
+chroma_db/
 server/uploads/*
 !server/uploads/.gitkeep
 *.ses
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
 *.db
 *.sqlite
 *.sqlite3
 
-# Editor directories and files
+# Editor directories and operating system artifacts
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -43,13 +48,15 @@ __pycache__/
 *.sln
 *.sw?
 
+# Generated Prisma clients
 /generated/prisma
 prisma/generated-pg-client/
 
-# SQLite local database
+# SQLite local databases
 prisma/dev.db
 prisma/dev.db-journal
+dev.db
 
-# Conflicting lockfiles (project uses npm)
+# Lockfile & TypeScript build cache
 bun.lockb
 *.tsbuildinfo
