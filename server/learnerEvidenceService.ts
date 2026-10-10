@@ -31,6 +31,7 @@ import {
   type MasteryStatus,
 } from './bktService.ts';
 import { calculateConceptRetention } from './bktCalibrationService.ts';
+import { isGenericOrBoilerplate } from './questionQualityValidator.ts';
 
 // =========================================================================
 // 1. Concept Taxonomy Normalization
@@ -112,9 +113,20 @@ export function extractLearnerEvidence(
     | 'unverifiable';
 
   let validity: EvidenceValidity = 'VALID_EVIDENCE';
-  if (classification === 'invalid_format') {
+  if (
+    classification === 'invalid_format' ||
+    evaluation.is_valid === false ||
+    evaluation.quality_valid === false ||
+    (Array.isArray(evaluation.quality_issues) && evaluation.quality_issues.length > 0) ||
+    isGenericOrBoilerplate(evaluation.question) ||
+    isGenericOrBoilerplate(evaluation.concept)
+  ) {
     validity = 'DISCARDED_INVALID';
-  } else if (classification === 'unverifiable') {
+  } else if (
+    classification === 'unverifiable' ||
+    evaluation.verifiability === 'UNVERIFIABLE' ||
+    evaluation.verifiability === 'QUARANTINED'
+  ) {
     validity = 'DISCARDED_UNVERIFIABLE';
   }
 

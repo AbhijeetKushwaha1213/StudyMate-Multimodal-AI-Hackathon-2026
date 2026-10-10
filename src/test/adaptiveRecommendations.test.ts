@@ -871,6 +871,7 @@ describe('Canonical Phase 5 — Step 3: Adaptive Learning Recommendations', () =
       const { req, res } = createMockReqRes({
         method: 'GET',
         url: `http://localhost:3001/api/learner/recommendations?userId=${apiUser}`,
+        headers: { 'x-dev-user-id': apiUser },
         query: { userId: apiUser },
       });
 
@@ -896,6 +897,7 @@ describe('Canonical Phase 5 — Step 3: Adaptive Learning Recommendations', () =
       const { req, res } = createMockReqRes({
         method: 'GET',
         url: `http://localhost:3001/api/learner/recommendations?userId=${limitUser}&limit=2`,
+        headers: { 'x-dev-user-id': limitUser },
         query: { userId: limitUser, limit: '2' },
       });
 
@@ -922,6 +924,7 @@ describe('Canonical Phase 5 — Step 3: Adaptive Learning Recommendations', () =
       const { req, res } = createMockReqRes({
         method: 'GET',
         url: `http://localhost:3001/api/learner/recommendations?userId=${filterUser}&topic=Algebra`,
+        headers: { 'x-dev-user-id': filterUser },
         query: { userId: filterUser, topic: 'Algebra' },
       });
 

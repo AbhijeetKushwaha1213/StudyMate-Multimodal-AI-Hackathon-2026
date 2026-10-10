@@ -2,17 +2,17 @@ import { prisma, ensureAssessmentSchema, ensureLearnerSchema } from './prisma.ts
 import { updateMasteryFromEvidence, getTopicLearnerMastery, type BKTParameters } from './bktService.ts';
 import { extractLearnerEvidence, recordLearnerEvidence, getTopicMasteryState } from './learnerEvidenceService.ts';
 import { gradeNumericalAnswer, parseStudentAnswer } from './numericalVerifier.ts';
-import type {
-  NumericalQuestion,
-  NumericalAnswerSubmission,
-  AuthoritativeQuestion,
-  AnswerSubmissionPayload,
-  MisconceptionCategory,
+import {
+  type NumericalQuestion,
+  type NumericalAnswerSubmission,
+  type AuthoritativeQuestion,
+  type AnswerSubmissionPayload,
+  type MisconceptionCategory,
+  DEFAULT_TOLERANCE,
 } from './assessmentTypes.ts';
-import { DEFAULT_TOLERANCE } from './assessmentTypes.ts';
-import { gradeUniversalAnswer, normalizeText } from './robustAnswerVerifier.ts';
+import { gradeUniversalAnswer, normalizeText, checkSemanticTopicRelevance, isGenericOrBoilerplate } from './robustAnswerVerifier.ts';
 
-export type AnswerClassification = 'correct' | 'partially_correct' | 'incorrect';
+export type AnswerClassification = 'correct' | 'partially_correct' | 'incorrect' | 'unverifiable';
 
 export interface AnswerEvaluationInput {
   questionId: string;

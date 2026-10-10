@@ -56,7 +56,12 @@ export interface QuizViewerProps {
 function randomizeQuizOptions(list: QuizQuestion[]): QuizQuestion[] {
   if (!Array.isArray(list)) return [];
   return list.map((q) => {
-    if ((q.type || 'MCQ').toUpperCase() !== 'MCQ' || !Array.isArray(q.options) || q.options.length < 2) {
+    if (
+      (q.type || 'MCQ').toUpperCase() !== 'MCQ' ||
+      !Array.isArray(q.options) ||
+      q.options.length < 2 ||
+      (q as any).options_balanced
+    ) {
       return q;
     }
 

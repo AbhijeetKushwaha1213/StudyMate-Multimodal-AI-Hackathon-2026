@@ -51,6 +51,10 @@ export {
   checkDistractorQuality,
   checkQuestionAmbiguity,
   checkQuestionConsistency,
+  checkSemanticTopicRelevance,
+  isGenericOrBoilerplate,
+  generateBalancedPositions,
+  balanceAndRandomizeQuestionOptions,
   detectNearDuplicate,
   verifyQuestionGrounding,
   validateHardenedQuestion,
@@ -1222,8 +1226,18 @@ export function gradeUniversalAnswer(
   submission: AnswerSubmissionPayload,
   authoritativeQuestion: AuthoritativeQuestion
 ): UniversalGradingResult {
-  if (!authoritativeQuestion || (authoritativeQuestion.correct_answer === undefined && (authoritativeQuestion as any).correctAnswer === undefined)) {
-    const coord = buildCoordinateLabel(authoritativeQuestion || {} as any);
+  if (
+    !authoritativeQuestion ||
+    (authoritativeQuestion.correct_answer === undefined && (authoritativeQuestion as any).correctAnswer === undefined) ||
+    authoritativeQuestion.verifiability === 'UNVERIFIABLE' ||
+    authoritativeQuestion.verifiability === 'QUARANTINED' ||
+    (authoritativeQuestion as any).is_valid === false
+  ) {
+    const coord = buildCoordinateLabel(authoritativeQuestion || ({} as any));
+    const isValidationFailure =
+      authoritativeQuestion?.verifiability === 'UNVERIFIABLE' ||
+      authoritativeQuestion?.verifiability === 'QUARANTINED' ||
+      (authoritativeQuestion as any)?.is_valid === false;
     return {
       question_id: authoritativeQuestion?.question_id || 'invalid_q',
       question_type: authoritativeQuestion?.type || 'MCQ',
@@ -1232,7 +1246,9 @@ export function gradeUniversalAnswer(
       is_correct: false,
       is_partial: false,
       error_category: 'UNVERIFIABLE',
-      feedback: 'Authoritative answer key is missing for this question.',
+      feedback: isValidationFailure
+        ? 'Question cannot be verified or has been quarantined due to topic relevance/quality validation failure.'
+        : 'Authoritative answer key is missing for this question.',
       explanation: authoritativeQuestion?.explanation || '',
       source_citation: coord,
       citation_label: coord,

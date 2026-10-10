@@ -317,10 +317,12 @@ export interface AuthoritativeQuestion {
   timestamp_end?: number | null;
   source_type?: string;
   
-  // Explanations
+  // Explanations & Balancing
   explanation?: string;
   fingerprint?: string;
   normalized_question?: string;
+  options_balanced?: boolean;
+  correct_answer_index?: number;
 }
 
 /**
@@ -440,7 +442,11 @@ export type QualityIssueCode =
   | 'DUPLICATE_QUESTION'
   | 'NEAR_DUPLICATE_QUESTION'
   | 'UNVERIFIABLE_NUMERICAL'
-  | 'MALFORMED_METADATA';
+  | 'MALFORMED_METADATA'
+  | 'CIRCULAR_DEFINITION'
+  | 'GENERIC_FILLER_BOILERPLATE'
+  | 'TRIVIAL_ABSURD_DISTRACTOR'
+  | 'TOPIC_RELEVANCE_FAILED';
 
 export interface QuestionQualityIssue {
   code: QualityIssueCode | string;
@@ -463,6 +469,13 @@ export interface ConsistencyCheckResult {
 export interface DistractorQualityResult {
   valid: boolean;
   issues: string[];
+}
+
+export interface TopicRelevanceCheckResult {
+  is_relevant: boolean;
+  issues: string[];
+  substantive_ratio: number;
+  detected_boilerplate?: string[];
 }
 
 export interface GroundingValidationResult {
@@ -492,6 +505,7 @@ export interface HardenedQuestionValidationResult {
   ambiguity: AmbiguityCheckResult;
   consistency: ConsistencyCheckResult;
   distractor_quality: DistractorQualityResult;
+  topic_relevance?: TopicRelevanceCheckResult;
   grounding?: GroundingValidationResult;
   duplicate_check?: DuplicateCheckResult;
 }
@@ -503,6 +517,10 @@ export interface QuestionValidationContext {
   existing_fingerprints?: string[];
   evidence_index?: any;
   resource_checker?: (resourceId: string) => Promise<{ exists: boolean; isDeleted: boolean; userId: string; tenantType?: string } | null>;
+  subject?: string;
+  topic?: string;
+  subtopic?: string;
+  seed?: number | string;
 }
 
 

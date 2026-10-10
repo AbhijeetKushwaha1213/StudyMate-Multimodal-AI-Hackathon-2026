@@ -212,12 +212,14 @@ export async function resolveContextUser(
     if (devHeaderUser) {
       return devHeaderUser;
     }
-    return (
-      req.query?.userId ||
-      req.body?.userId ||
-      req.body?.user_id ||
-      'default_user'
-    );
+    if (allowAnonymousDev) {
+      return (
+        req.query?.userId ||
+        req.body?.userId ||
+        req.body?.user_id ||
+        'default_user'
+      );
+    }
   }
 
   throw new AuthError('Authentication required. Missing Bearer token.', 401);

@@ -616,6 +616,7 @@ export async function ragHandler(req: RagApiRequest, res: RagApiResponse) {
       }
 
       const subtopic = body.subtopic;
+      const subject = body.subject;
       const difficulty = body.difficulty || 'medium';
       const count = Number(body.count || 5);
       const questionType = body.questionType || body.type || 'MCQ';
@@ -653,6 +654,7 @@ export async function ragHandler(req: RagApiRequest, res: RagApiResponse) {
         '--assessment-id',
         assessmentId,
       ];
+      if (subject) args.push('--subject', String(subject));
       if (subtopic) args.push('--subtopic', String(subtopic));
       if (sourceId) args.push('--source-id', String(sourceId));
       if (existingFps.length > 0) args.push('--fingerprints', JSON.stringify(existingFps));
@@ -665,13 +667,16 @@ export async function ragHandler(req: RagApiRequest, res: RagApiResponse) {
         return;
       }
 
-      // 3. Phase 4 Step 3: Server-side hardened question quality, ambiguity, and deduplication verification
+      // 3. Phase 4 Step 3: Server-side hardened question quality, ambiguity, topic relevance, and deduplication verification
       const rawQuestions = genResult.questions || [];
       const validationContext = {
         authenticated_user_id: String(userId),
         require_grounding: Boolean(sourceId),
         existing_fingerprints: existingFps,
         existing_questions: existingQuestions.map((q) => ({ question: q })),
+        subject: subject ? String(subject) : undefined,
+        topic: String(topic),
+        subtopic: subtopic ? String(subtopic) : undefined,
       };
 
       const batchValidation = await validateHardenedQuestionBatch(rawQuestions, validationContext);
@@ -679,7 +684,7 @@ export async function ragHandler(req: RagApiRequest, res: RagApiResponse) {
       const quarantined = batchValidation.quarantined_questions;
 
       if (quarantined.length > 0) {
-        console.warn(`Phase 4 Step 3: Quarantined ${quarantined.length} question(s) failing quality/ambiguity validation:`,
+        console.warn(`Phase 4 Step 3: Quarantined ${quarantined.length} question(s) failing quality/ambiguity/topic relevance validation:`,
           quarantined.map(r => ({
             q: r.question?.question?.substring(0, 60),
             status: r.validation?.status,
@@ -689,33 +694,15 @@ export async function ragHandler(req: RagApiRequest, res: RagApiResponse) {
         );
       }
 
-      // Guarantee option shuffling for all MCQ questions so correct answer position is distributed naturally across options
-      for (const q of questions) {
-        if ((q.type || 'MCQ').toUpperCase() === 'MCQ' && Array.isArray(q.options) && q.options.length > 1) {
-          // Resolve authoritative correct answer text
-          let correctText = String(q.correct_answer ?? q.correctAnswer ?? '').trim();
-          const rawIdx = parseInt(correctText, 10);
-          if (!isNaN(rawIdx) && rawIdx >= 0 && rawIdx < q.options.length) {
-            correctText = String(q.options[rawIdx]).trim();
-          } else {
-            const match = q.options.find(
-              (opt: any) => String(opt).trim().toLowerCase() === correctText.toLowerCase()
-            );
-            if (match) {
-              correctText = String(match).trim();
-            }
-          }
-
-          // Shuffle options using Fisher-Yates
-          const shuffled = [...q.options];
-          for (let i = shuffled.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-          }
-          q.options = shuffled;
-          q.correct_answer = correctText;
-          q.correctAnswer = correctText;
-        }
+      // If no valid, reliable questions remain, fail safely with an actionable error rather than delivering generic boilerplate
+      if (questions.length === 0) {
+        const topicPath = subject ? `${subject} → ${topic}` : topic;
+        res.status(422).json({
+          success: false,
+          error: `Could not generate enough reliable questions for ${topicPath}. Try adding course notes or retrying with a narrower subtopic.`,
+          questions: [],
+        });
+        return;
       }
 
       // 4. Persist valid generated questions into assessment_questions table with full deduplication metadata

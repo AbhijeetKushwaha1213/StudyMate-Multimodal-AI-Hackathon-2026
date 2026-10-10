@@ -1794,7 +1794,8 @@ def _generate_curriculum_baseline_questions(
     count: int = 5,
     question_type: str = "MCQ",
     assessment_id: Optional[str] = None,
-    used_fps: Optional[set] = None
+    used_fps: Optional[set] = None,
+    subject: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Generate high-quality diagnostic baseline assessment questions grounded strictly in standard
@@ -1803,7 +1804,7 @@ def _generate_curriculum_baseline_questions(
     asmt_id = assessment_id or f"asmt_{int(time.time() * 1000)}"
     used_fps = used_fps or set()
     topic_clean = topic.strip().title()
-    subtopic_clean = (subtopic or "Core Principles").strip().title()
+    subtopic_clean = (subtopic or "").strip().title() or "Core Concepts"
 
     questions = []
 
@@ -1813,24 +1814,27 @@ def _generate_curriculum_baseline_questions(
     if api_key:
         try:
             import httpx
+            subj_label = f"Subject: {subject.strip().title()}\n" if subject else ""
             prompt = (
                 f"You are an expert university professor creating an adaptive diagnostic assessment.\n"
+                f"{subj_label}"
                 f"Course Topic: {topic_clean}\n"
                 f"Subtopic: {subtopic_clean}\n"
                 f"Difficulty: {difficulty}\n"
                 f"Target Question Count: {count}\n"
                 f"Format: {question_type}\n\n"
                 f"CRITICAL RULES:\n"
-                f"1. Generate questions STRICTLY AND EXCLUSIVELY about {topic_clean} ({subtopic_clean}).\n"
-                f"2. DO NOT introduce unrelated concepts, subjects, or academic buzzwords (e.g. NEVER mention software architecture, safety invariants, Bayesian Knowledge Tracing, or operating systems unless the topic is specifically about that).\n"
-                f"3. Calibrate difficulty to '{difficulty}':\n"
+                f"1. Generate questions STRICTLY AND EXCLUSIVELY testing concrete mechanisms, algorithms, trade-offs, or scenarios within {topic_clean} ({subtopic_clean}).\n"
+                f"2. STRICTLY PROHIBITED: Never generate circular definitions or tautological questions (e.g. 'Which statement defines Core Principles in synchronization' or 'what is the role of Core Principles').\n"
+                f"3. STRICTLY PROHIBITED: Do NOT use generic filler sentences or buzzwords (e.g. 'foundational principles and mechanisms governing', 'speculative guesswork', 'contradict verified empirical laws', 'shortest textual name').\n"
+                f"4. Calibrate difficulty to '{difficulty}':\n"
                 f"   - easy: foundational definitions, term recognition, basic principles of {topic_clean}.\n"
                 f"   - medium: conceptual reasoning, comparing principles, moderate application in {topic_clean}.\n"
                 f"   - hard: multi-step problem solving, tricky edge cases, deep reasoning or calculations in {topic_clean}.\n"
-                f"4. Support varied question types: conceptual understanding, definitions, applications, comparisons, and numerical calculations where applicable.\n"
-                f"5. For MCQ, provide 4 options where distractors are plausible misconceptions within {topic_clean}, NOT phrases from unrelated subjects.\n"
-                f"6. CRITICAL: Randomize the placement of the correct answer among options A, B, C, and D. Do NOT always place the correct answer as option A or the first option. Distribute correct answers across all positions.\n"
-                f"7. Return ONLY a valid JSON array of objects with the schema:\n"
+                f"5. Support varied question types: conceptual understanding, definitions, applications, comparisons, and numerical calculations where applicable.\n"
+                f"6. For MCQ, provide 4 options where distractors are plausible misconceptions within {topic_clean}, NOT phrases from unrelated subjects or absurd filler.\n"
+                f"7. CRITICAL: Randomize the placement of the correct answer among options A, B, C, and D. Distribute correct answers across all positions.\n"
+                f"8. Return ONLY a valid JSON array of objects with the schema:\n"
                 f"[\n"
                 f"  {{\n"
                 f"    \"question\": \"clear question stem directly about {topic_clean}\",\n"
@@ -1908,7 +1912,7 @@ def _generate_curriculum_baseline_questions(
             logger.warning(f"Gemini baseline generation error: {e}")
 
     # 2. Rich, domain-accurate diagnostic question banks if Gemini unavailable
-    norm_t = (topic + " " + (subtopic or "")).lower()
+    norm_t = (f"{subject or ''} {topic} {subtopic or ''}").lower()
     domain_bank = []
 
     # 2A. Linear Algebra & Matrix Theory
@@ -2189,70 +2193,123 @@ def _generate_curriculum_baseline_questions(
             }
         ]
 
-    # 2F. General Topic-Faithful Generator (Never uses off-topic software architecture or safety invariants!)
+    # 2F. Operating Systems & Concurrency / Synchronization
+    elif any(k in norm_t for k in ["operating system", "operating systems", "os", "synchronization", "concurrency", "deadlock", "mutex", "semaphore", "process", "thread", "virtual memory", "paging", "file system", "kernel"]):
+        if any(k in norm_t for k in ["synchronization", "sync", "mutex", "semaphore", "critical section", "race condition", "monitor", "lock", "concurrency"]):
+            domain_bank = [
+                {
+                    "subtopic": "Critical Section Problem",
+                    "question": "Which set of three requirements must any valid solution to the critical-section problem strictly satisfy in an operating system?",
+                    "options": [
+                        "Mutual Exclusion, Progress, and Bounded Waiting",
+                        "Preemption, Hold-and-Wait, and Starvation",
+                        "Mutual Exclusion, Infinite Buffering, and Busy Waiting",
+                        "Shortest Job First, Aging, and Context Switching"
+                    ],
+                    "correct_answer": "Mutual Exclusion, Progress, and Bounded Waiting",
+                    "explanation": "Every valid solution to the critical-section problem must guarantee Mutual Exclusion (only one process in the critical section at a time), Progress (processes waiting to enter participate in the decision, not postponed indefinitely), and Bounded Waiting (a bound exists on the number of times others enter before a waiting process is granted access)."
+                },
+                {
+                    "subtopic": "Counting vs Binary Semaphores",
+                    "question": "In operating systems synchronization, what distinguishes a counting semaphore from a binary semaphore (mutex)?",
+                    "options": [
+                        "A counting semaphore manages an integer value over an unrestricted domain of resource instances, whereas a binary semaphore is strictly constrained to 0 and 1",
+                        "A counting semaphore permits multiple threads into the same critical section simultaneously without restriction",
+                        "A binary semaphore automatically detects and resolves circular-wait deadlocks at compile time",
+                        "A counting semaphore can only be accessed through non-atomic arithmetic increment instructions"
+                    ],
+                    "correct_answer": "A counting semaphore manages an integer value over an unrestricted domain of resource instances, whereas a binary semaphore is strictly constrained to 0 and 1",
+                    "explanation": "Counting semaphores control access to a finite pool of identical resource units using an integer counter. Binary semaphores act strictly as mutex locks with integer values restricted to 0 (locked) and 1 (unlocked)."
+                },
+                {
+                    "subtopic": "Race Conditions",
+                    "question": "What is the defining characteristic of a race condition in concurrent software systems?",
+                    "options": [
+                        "The final state of shared memory depends non-deterministically on the exact order or timing of thread execution",
+                        "Two threads execute on different CPU sockets without accessing any shared memory variables",
+                        "A process runs indefinitely in a CPU-bound compute loop without issuing system calls",
+                        "The operating system scheduler assigns higher priority to I/O-bound tasks"
+                    ],
+                    "correct_answer": "The final state of shared memory depends non-deterministically on the exact order or timing of thread execution",
+                    "explanation": "A race condition occurs when two or more threads access shared mutable data concurrently, and the final state depends on the unpredictable interleaving or relative execution timing of the threads."
+                },
+                {
+                    "subtopic": "Mutex Locks vs Spinlocks",
+                    "question": "Under which operational condition is a spinlock generally preferred over a standard blocking mutex lock?",
+                    "options": [
+                        "On multi-core processors when the expected critical-section duration is shorter than the overhead of two thread context switches",
+                        "On single-core uniprocessor systems where threads perform long blocking disk I/O inside the critical section",
+                        "Whenever priority inversion must be completely eliminated without operating system kernel intervention",
+                        "When memory consumption must be strictly minimized on virtualized network interfaces"
+                    ],
+                    "correct_answer": "On multi-core processors when the expected critical-section duration is shorter than the overhead of two thread context switches",
+                    "explanation": "Spinlocks avoid the high cost of putting a thread to sleep and performing two context switches (sleep and wake). On multi-core systems, busy waiting for a short duration is more efficient than context switching."
+                },
+                {
+                    "subtopic": "Monitors and Condition Variables",
+                    "question": "What is the operational function of the wait() operation on a condition variable inside an operating system monitor?",
+                    "options": [
+                        "The invoking thread releases the monitor lock and suspends its execution until another thread signals the condition",
+                        "The invoking thread increments an internal integer counter and continues executing inside the monitor",
+                        "The invoking thread forcibly aborts all competing threads currently waiting in the entry queue",
+                        "The operating system restarts the entire user process from main() with refreshed page tables"
+                    ],
+                    "correct_answer": "The invoking thread releases the monitor lock and suspends its execution until another thread signals the condition",
+                    "explanation": "Condition variables inside monitors provide synchronization without mutual exclusion semantics. Calling wait() atomically releases the monitor mutex and places the calling thread on the condition's wait queue until signal() is called."
+                }
+            ]
+        else:
+            domain_bank = [
+                {
+                    "subtopic": "Process Lifecycle & State Transitions",
+                    "question": f"In {topic_clean}, which state transition occurs when an executing process issues an I/O request and must wait for completion?",
+                    "options": ["Running to Blocked/Waiting", "Blocked to Running", "Ready to Terminated", "Running to Ready"],
+                    "correct_answer": "Running to Blocked/Waiting",
+                    "explanation": "When an executing process issues a blocking I/O request or system call, it moves from the Running state to the Blocked/Waiting state until the I/O operation completes."
+                },
+                {
+                    "subtopic": "Deadlock Characterization & Prevention",
+                    "question": "Which of the following conditions is NOT one of the four essential Coffman conditions required for a deadlock to occur?",
+                    "options": ["Preemptive Resource Allocation", "Mutual Exclusion", "Hold and Wait", "Circular Wait"],
+                    "correct_answer": "Preemptive Resource Allocation",
+                    "explanation": "Deadlock requires No Preemption (resources cannot be forcibly taken from a process holding them), along with Mutual Exclusion, Hold and Wait, and Circular Wait."
+                },
+                {
+                    "subtopic": "Virtual Memory & Address Translation",
+                    "question": f"What is the primary role of the Translation Lookaside Buffer (TLB) in {topic_clean} memory management?",
+                    "options": [
+                        "To cache recent virtual-to-physical address translations for fast lookup",
+                        "To store secondary disk swap partitions for backing storage",
+                        "To allocate CPU execution slices to user-level threads",
+                        "To encrypt process memory spaces during hardware context switching"
+                    ],
+                    "correct_answer": "To cache recent virtual-to-physical address translations for fast lookup",
+                    "explanation": "The TLB is a high-speed associative hardware cache that stores recently used page table mappings to avoid repeated memory access delays."
+                },
+                {
+                    "subtopic": "CPU Scheduling Algorithms",
+                    "question": "Which CPU scheduling algorithm provides the theoretical minimum average waiting time for a stationary set of processes?",
+                    "options": ["Shortest Job First (SJF)", "First-Come, First-Served (FCFS)", "Round Robin (RR)", "Multilevel Feedback Queue without priority aging"],
+                    "correct_answer": "Shortest Job First (SJF)",
+                    "explanation": "Shortest Job First (SJF) is provably optimal with respect to minimizing average waiting time for a stationary set of jobs."
+                },
+                {
+                    "subtopic": "File System Architecture & Inodes",
+                    "question": "In a standard UNIX file system architecture, which data is stored inside an inode?",
+                    "options": [
+                        "File metadata, permissions, owner ID, size, and data block pointers (excluding the file name)",
+                        "The human-readable file name and its parent directory path only",
+                        "The raw unstructured payload bytes stored contiguously on the platter",
+                        "The operating system kernel symbol lookup table"
+                    ],
+                    "correct_answer": "File metadata, permissions, owner ID, size, and data block pointers (excluding the file name)",
+                    "explanation": "An inode stores all file metadata (file size, permissions, owner, timestamps, and pointers to disk blocks), while the file name is stored separately in the directory table."
+                }
+            ]
+
+    # 2G. Fail-Closed Safe Fallback (Never synthesize generic boilerplate phrases or circular definitions!)
     else:
-        domain_bank = [
-            {
-                "subtopic": f"{subtopic_clean} - Core Definition",
-                "question": f"Which statement accurately defines the fundamental concept of {subtopic_clean} in {topic_clean}?",
-                "options": [
-                    f"The foundational principles and mechanisms governing {subtopic_clean} within {topic_clean}",
-                    f"An unrelated secondary hypothesis rejected by standard {topic_clean} theory",
-                    f"A transient calculation error that does not reflect verified {topic_clean} models",
-                    f"A non-standard convention unsupported by peer-reviewed literature in {topic_clean}"
-                ],
-                "correct_answer": f"The foundational principles and mechanisms governing {subtopic_clean} within {topic_clean}",
-                "explanation": f"Foundational mastery of {topic_clean} requires precise understanding of {subtopic_clean} and its governing conceptual framework."
-            },
-            {
-                "subtopic": f"{subtopic_clean} - Governing Principles",
-                "question": f"In {topic_clean}, what is the primary role or mechanism of {subtopic_clean}?",
-                "options": [
-                    f"To explain and predict core interactions and structural relationships in {topic_clean}",
-                    f"To contradict verified empirical laws and theoretical foundations of {topic_clean}",
-                    f"To eliminate quantitative evaluation and replace it with speculative guesswork",
-                    f"To prevent systematic analysis of {topic_clean} phenomena"
-                ],
-                "correct_answer": f"To explain and predict core interactions and structural relationships in {topic_clean}",
-                "explanation": f"Within {topic_clean}, {subtopic_clean} provides the theoretical framework for analyzing and resolving domain-specific problems."
-            },
-            {
-                "subtopic": f"{subtopic_clean} - Practical Application",
-                "question": f"When applying {subtopic_clean} to solve practical problems in {topic_clean}, which approach is methodologically sound?",
-                "options": [
-                    f"Systematically applying foundational formulas, theorems, and definitions established in {topic_clean}",
-                    f"Relying on arbitrary heuristics without verifying prerequisite constraints in {topic_clean}",
-                    f"Ignoring boundary constraints and fundamental definitions of {subtopic_clean}",
-                    f"Assuming all problems in {topic_clean} have identical trivial solutions"
-                ],
-                "correct_answer": f"Systematically applying foundational formulas, theorems, and definitions established in {topic_clean}",
-                "explanation": f"Rigorous problem solving in {topic_clean} demands systematic adherence to proven formulas, definitions, and theorems."
-            },
-            {
-                "subtopic": f"{subtopic_clean} - Comparative Analysis",
-                "question": f"When comparing different models or techniques in {topic_clean} ({subtopic_clean}), what is the primary distinguishing criterion?",
-                "options": [
-                    f"The validity of underlying assumptions, domain applicability, and accuracy of results in {topic_clean}",
-                    f"Whichever approach has the shortest textual name regardless of theoretical accuracy",
-                    f"Discarding mathematical consistency whenever calculations become complex",
-                    f"Assuming all methodologies produce identical outcomes regardless of inputs"
-                ],
-                "correct_answer": f"The validity of underlying assumptions, domain applicability, and accuracy of results in {topic_clean}",
-                "explanation": f"Evaluating models in {topic_clean} requires examining underlying assumptions, boundaries, and predictive validity."
-            },
-            {
-                "subtopic": f"{subtopic_clean} - Conceptual Misconceptions",
-                "question": f"What is a common conceptual misconception that students must avoid when studying {subtopic_clean} in {topic_clean}?",
-                "options": [
-                    f"Confusing surface-level terminology with deep structural mechanisms and mathematical definitions in {topic_clean}",
-                    f"Verifying every derivation against foundational principles of {topic_clean}",
-                    f"Practicing active problem solving and quantitative reasoning in {topic_clean}",
-                    f"Consulting authoritative textbooks and verified course materials"
-                ],
-                "correct_answer": f"Confusing surface-level terminology with deep structural mechanisms and mathematical definitions in {topic_clean}",
-                "explanation": f"Deep conceptual understanding in {topic_clean} requires distinguishing superficial terminology from underlying mechanisms and definitions."
-            }
-        ]
+        domain_bank = []
 
     for idx, item in enumerate(domain_bank[:count]):
         stem = item["question"]
@@ -2296,7 +2353,8 @@ def generate_grounded_assessment(
     existing_fingerprints: Optional[List[str]] = None,
     existing_questions: Optional[List[str]] = None,
     source_id: Optional[str] = None,
-    assessment_id: Optional[str] = None
+    assessment_id: Optional[str] = None,
+    subject: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Generate an adaptive course assessment strictly grounded in Chroma course materials.
@@ -2308,7 +2366,7 @@ def generate_grounded_assessment(
 
     # 1. Retrieve Chroma chunks for authenticated user
     search_res = search_relevant_chunks(
-        query=f"{topic} {subtopic or ''}".strip(),
+        query=f"{subject or ''} {topic} {subtopic or ''}".strip(),
         user_id=user_id,
         source_id=source_id,
         topic=topic,
@@ -2327,7 +2385,8 @@ def generate_grounded_assessment(
             count=count,
             question_type=question_type,
             assessment_id=asmt_id,
-            used_fps=used_fps
+            used_fps=used_fps,
+            subject=subject
         )
         if baseline_questions:
             return {
@@ -2340,9 +2399,10 @@ def generate_grounded_assessment(
                 "questions": baseline_questions,
                 "is_baseline": True
             }
+        subj_desc = f"{subject} → {topic}" if subject else topic
         return {
             "success": False,
-            "error": "No course materials found for this topic and student. Please upload textbooks, slides, or lecture videos first in Resources.",
+            "error": f"Could not generate enough reliable questions for {subj_desc}. Try adding course notes or retrying with a narrower subtopic.",
             "questions": []
         }
 
@@ -2714,6 +2774,7 @@ def main():
     assess_p = subparsers.add_parser("assessment-generate")
     assess_p.add_argument("--topic", required=True)
     assess_p.add_argument("--user-id", required=True)
+    assess_p.add_argument("--subject", default=None)
     assess_p.add_argument("--subtopic", default=None)
     assess_p.add_argument("--difficulty", default="medium")
     assess_p.add_argument("--count", type=int, default=5)
@@ -2807,7 +2868,8 @@ def main():
             existing_fingerprints=fps,
             existing_questions=prev_qs,
             source_id=args.source_id,
-            assessment_id=args.assessment_id
+            assessment_id=args.assessment_id,
+            subject=getattr(args, "subject", None)
         )
         print(json.dumps(res))
     else:

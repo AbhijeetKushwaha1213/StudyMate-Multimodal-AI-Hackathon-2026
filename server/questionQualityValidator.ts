@@ -32,6 +32,7 @@ import type {
   DuplicateCheckResult,
   HardenedQuestionValidationResult,
   QuestionValidationContext,
+  TopicRelevanceCheckResult,
   TolerancePolicy,
   NumericalQuestion,
 } from './assessmentTypes.ts';
@@ -181,6 +182,431 @@ export function detectPromptLeakage(question: any): { leaked: boolean; matches: 
     leaked: matches.length > 0,
     matches: Array.from(new Set(matches)),
   };
+}
+
+// =========================================================================
+// Semantic Topic Relevance, Tautology & Generic Boilerplate Validation
+// =========================================================================
+
+export const GENERIC_BOILERPLATE_PATTERNS: Array<{
+  pattern: RegExp;
+  description: string;
+  code: QualityIssueCode;
+}> = [
+  {
+    pattern: /\b(?:speculative guesswork|guesswork)\b/i,
+    description: 'Trivial absurd distractor using speculative guesswork placeholder',
+    code: 'TRIVIAL_ABSURD_DISTRACTOR',
+  },
+  {
+    pattern: /\bcontradict (?:verified )?(?:empirical|theoretical) (?:laws|foundations)\b/i,
+    description: 'Trivial absurd distractor contradicting empirical/theoretical laws',
+    code: 'TRIVIAL_ABSURD_DISTRACTOR',
+  },
+  {
+    pattern: /\b(?:the )?foundational principles and mechanisms governing\b/i,
+    description: 'Generic boilerplate tautology phrase in options',
+    code: 'GENERIC_FILLER_BOILERPLATE',
+  },
+  {
+    pattern: /\bmethodologically sound(?: approach)?\b/i,
+    description: 'Generic filler question asking for methodologically sound approach without domain content',
+    code: 'GENERIC_FILLER_BOILERPLATE',
+  },
+  {
+    pattern: /\bprimary distinguishing criterion\b/i,
+    description: 'Generic boilerplate comparative question without concrete domain models',
+    code: 'GENERIC_FILLER_BOILERPLATE',
+  },
+  {
+    pattern: /\bshortest textual name\b/i,
+    description: 'Trivial absurd distractor based on shortest textual name',
+    code: 'TRIVIAL_ABSURD_DISTRACTOR',
+  },
+  {
+    pattern: /\bdiscarding mathematical consistency\b/i,
+    description: 'Trivial absurd distractor discarding mathematical consistency',
+    code: 'TRIVIAL_ABSURD_DISTRACTOR',
+  },
+  {
+    pattern: /\bassuming all methodologies produce identical outcomes\b/i,
+    description: 'Trivial absurd distractor assuming all methodologies produce identical outcomes',
+    code: 'TRIVIAL_ABSURD_DISTRACTOR',
+  },
+  {
+    pattern: /\brelying on arbitrary heuristics without verifying prerequisite constraints\b/i,
+    description: 'Trivial absurd distractor relying on arbitrary heuristics',
+    code: 'TRIVIAL_ABSURD_DISTRACTOR',
+  },
+  {
+    pattern: /\bto prevent systematic analysis of\b/i,
+    description: 'Trivial absurd distractor preventing systematic analysis',
+    code: 'TRIVIAL_ABSURD_DISTRACTOR',
+  },
+  {
+    pattern: /\btransient calculation error that does not reflect verified\b/i,
+    description: 'Generic filler distractor about transient calculation error',
+    code: 'GENERIC_FILLER_BOILERPLATE',
+  },
+  {
+    pattern: /\bunrelated secondary hypothesis rejected by standard\b/i,
+    description: 'Generic filler distractor about unrelated secondary hypothesis',
+    code: 'GENERIC_FILLER_BOILERPLATE',
+  },
+  {
+    pattern: /\bnon-standard convention unsupported by peer-reviewed\b/i,
+    description: 'Generic filler distractor about non-standard convention',
+    code: 'GENERIC_FILLER_BOILERPLATE',
+  },
+  {
+    pattern: /\beliminate quantitative evaluation\b/i,
+    description: 'Trivial absurd distractor eliminating quantitative evaluation',
+    code: 'TRIVIAL_ABSURD_DISTRACTOR',
+  },
+  {
+    pattern: /\bconfusing surface-level terminology with deep structural\b/i,
+    description: 'Generic filler distractor about surface-level terminology',
+    code: 'GENERIC_FILLER_BOILERPLATE',
+  },
+  {
+    pattern: /\bwhich statement accurately defines (?:the fundamental concept of )?core principles\b/i,
+    description: 'Generic circular question stem about Core Principles',
+    code: 'CIRCULAR_DEFINITION',
+  },
+  {
+    pattern: /\bprimary role or mechanism of core principles\b/i,
+    description: 'Generic boilerplate question stem about Core Principles',
+    code: 'GENERIC_FILLER_BOILERPLATE',
+  },
+  {
+    pattern: /\bapplying core principles to solve practical problems\b/i,
+    description: 'Generic boilerplate question stem about applying Core Principles',
+    code: 'GENERIC_FILLER_BOILERPLATE',
+  },
+  {
+    pattern: /\bto explain and predict core interactions and structural relationships in\b/i,
+    description: 'Generic boilerplate answer option lacking technical mechanism',
+    code: 'GENERIC_FILLER_BOILERPLATE',
+  },
+];
+
+/**
+ * Checks if a string or concept title matches generic boilerplate or empty filler patterns.
+ */
+export function isGenericOrBoilerplate(text: string): boolean {
+  if (!text || typeof text !== 'string') return false;
+  const lower = text.toLowerCase().trim();
+  if (/^(?:the\s+)?core\s+principles?$/i.test(lower)) return true;
+  for (const item of GENERIC_BOILERPLATE_PATTERNS) {
+    if (item.pattern.test(lower)) return true;
+  }
+  return false;
+}
+
+const STOPWORDS_SET = new Set([
+  'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+  'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'about', 'against',
+  'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
+  'from', 'up', 'down', 'out', 'off', 'over', 'under', 'again', 'further',
+  'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all',
+  'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such',
+  'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very',
+  'can', 'will', 'just', 'should', 'now', 'which', 'what', 'who', 'whom',
+  'this', 'that', 'these', 'those', 'am', 'it', 'its', 'their', 'they', 'them',
+]);
+
+const META_ACADEMIC_SET = new Set([
+  'core', 'principle', 'principles', 'concept', 'concepts', 'fundamental',
+  'foundational', 'mechanism', 'mechanisms', 'methodology', 'methodologies',
+  'methodological', 'framework', 'frameworks', 'approach', 'approaches',
+  'theory', 'theories', 'theoretical', 'empirical', 'standard', 'verified',
+  'phenomenon', 'phenomena', 'study', 'studying', 'practical', 'problem',
+  'problems', 'distinguishing', 'criterion', 'criteria', 'application',
+  'applications', 'accurate', 'accurately', 'definition', 'definitions',
+  'role', 'roles', 'model', 'models', 'technique', 'techniques',
+  'systematically', 'applying', 'solve', 'solving', 'sound', 'misconception',
+  'misconceptions', 'general', 'primary', 'governing', 'constituting',
+  'underlying', 'deep', 'surface', 'level', 'terminology', 'speculative',
+  'guesswork', 'unrelated', 'secondary', 'hypothesis', 'transient',
+  'calculation', 'error', 'nonstandard', 'convention', 'unsupported',
+  'peerreviewed', 'literature', 'laws', 'statement', 'accurately',
+]);
+
+/**
+ * Validates semantic topic relevance, tautologies, circular definitions,
+ * and generic boilerplate filler phrases across any subject/topic dynamically.
+ */
+export function checkSemanticTopicRelevance(
+  question: any,
+  context?: QuestionValidationContext
+): TopicRelevanceCheckResult {
+  const issues: string[] = [];
+  const detected_boilerplate: string[] = [];
+
+  const stem = String(question.question || question.stem || '').trim();
+  const rawAns = String(question.correct_answer ?? question.correctAnswer ?? '').trim();
+  const expl = String(question.explanation || '').trim();
+  const options = Array.isArray(question.options) ? question.options : [];
+
+  const allTexts: string[] = [stem, rawAns, expl];
+  for (const opt of options) {
+    allTexts.push(extractOptionText(opt));
+  }
+
+  // 1. Scan for explicit generic boilerplate / filler patterns
+  for (const item of GENERIC_BOILERPLATE_PATTERNS) {
+    for (const text of allTexts) {
+      if (item.pattern.test(text)) {
+        const issueMsg = `Detected generic boilerplate filler: "${item.description}"`;
+        if (!issues.includes(issueMsg)) {
+          issues.push(issueMsg);
+          detected_boilerplate.push(item.description);
+        }
+      }
+    }
+  }
+
+  // 2. Circular Definition & Tautology Check
+  const stemLower = stem.toLowerCase();
+  const ansLower = rawAns.toLowerCase();
+
+  // Pattern A: "Which statement accurately defines... X in Y" -> "The foundational principles and mechanisms governing X"
+  if (
+    stemLower.includes('accurately defines') &&
+    (ansLower.includes('principles and mechanisms governing') ||
+     ansLower.includes('foundational principles'))
+  ) {
+    issues.push('Circular definition detected: question asks for definition but answer merely asserts governing principles without content.');
+  }
+
+  // Pattern B: Stem repeats concept name and answer only repeats concept name with no attributes
+  const topicWords = [
+    ...(context?.topic ? context.topic.toLowerCase().split(/\s+/) : []),
+    ...(context?.subtopic ? context.subtopic.toLowerCase().split(/\s+/) : []),
+    ...(question.topic ? String(question.topic).toLowerCase().split(/\s+/) : []),
+    ...(question.subtopic ? String(question.subtopic).toLowerCase().split(/\s+/) : []),
+  ].filter((w) => w.length > 2);
+
+  // 3. Domain Substantive Content Ratio (DSCR)
+  // Ensure the question stem and options contain real technical domain terms,
+  // not just meta-academic buzzwords + repeated topic names.
+  const combinedTokens = allTexts
+    .join(' ')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 2);
+
+  let totalContentWords = 0;
+  let substantiveWords = 0;
+
+  for (const tok of combinedTokens) {
+    if (STOPWORDS_SET.has(tok)) continue;
+    totalContentWords++;
+
+    const isTopicWord = topicWords.includes(tok);
+    const isMetaAcademic = META_ACADEMIC_SET.has(tok);
+
+    if (!isTopicWord && !isMetaAcademic) {
+      substantiveWords++;
+    }
+  }
+
+  const substantive_ratio = totalContentWords > 0 ? substantiveWords / totalContentWords : 0;
+
+  if (totalContentWords >= 15 && substantive_ratio < 0.22) {
+    issues.push(
+      `Question lacks domain-specific technical substance (substantive ratio ${Math.round(substantive_ratio * 100)}% < 22%). Appears to be generic meta-academic boilerplate filler.`
+    );
+  }
+
+  return {
+    is_relevant: issues.length === 0,
+    issues,
+    substantive_ratio,
+    detected_boilerplate: detected_boilerplate.length > 0 ? detected_boilerplate : undefined,
+  };
+}
+
+// =========================================================================
+// Correct-Option Balancing & Authoritative Key Synchronization
+// =========================================================================
+
+function createPRNG(seedInput?: number | string): () => number {
+  let s: number;
+  if (typeof seedInput === 'number') {
+    s = seedInput >>> 0;
+  } else if (typeof seedInput === 'string') {
+    let hash = 0;
+    for (let i = 0; i < seedInput.length; i++) {
+      hash = (Math.imul(31, hash) + seedInput.charCodeAt(i)) | 0;
+    }
+    s = hash >>> 0;
+  } else {
+    const buf = crypto.randomBytes(4);
+    s = buf.readUInt32BE(0);
+  }
+
+  return function next(): number {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
+ * Generates balanced, non-repeating target positions for a batch of questions.
+ * Avoids all-A bias, avoids predictable cycles (0, 1, 2, 3, 0), and avoids adjacent duplicates.
+ */
+export function generateBalancedPositions(
+  count: number,
+  numChoices = 4,
+  rng?: () => number
+): number[] {
+  const rand = rng || (() => Math.random());
+  if (count <= 0) return [];
+  if (count === 1) return [Math.floor(rand() * numChoices)];
+
+  const pool: number[] = [];
+  while (pool.length < count) {
+    const chunk = Array.from({ length: numChoices }, (_, i) => i);
+    for (let i = chunk.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [chunk[i], chunk[j]] = [chunk[j], chunk[i]];
+    }
+    pool.push(...chunk);
+  }
+  const positions = pool.slice(0, count);
+
+  for (let attempt = 0; attempt < 20; attempt++) {
+    let hasAdjacentIdentical = false;
+    for (let i = 1; i < positions.length; i++) {
+      if (positions[i] === positions[i - 1]) {
+        hasAdjacentIdentical = true;
+        for (let j = 0; j < positions.length; j++) {
+          if (positions[j] !== positions[i] && (j === 0 || positions[j - 1] !== positions[i])) {
+            [positions[i], positions[j]] = [positions[j], positions[i]];
+            break;
+          }
+        }
+      }
+    }
+    const isPredictableAscending = positions.slice(0, 4).every((v, i) => v === i);
+    if (!hasAdjacentIdentical && !isPredictableAscending) {
+      break;
+    }
+    const i1 = Math.floor(rand() * positions.length);
+    const i2 = Math.floor(rand() * positions.length);
+    [positions[i1], positions[i2]] = [positions[i2], positions[i1]];
+  }
+
+  const allIdentical = positions.every((p) => p === positions[0]);
+  if (allIdentical && positions.length > 1) {
+    for (let i = 1; i < positions.length; i++) {
+      positions[i] = (positions[i - 1] + 1) % numChoices;
+    }
+  }
+
+  return positions;
+}
+
+/**
+ * Balances and randomizes multiple-choice options across questions so correct
+ * answer positions are distributed fairly across options (A, B, C, D) without
+ * positional bias while strictly preserving authoritative answer keys.
+ */
+export function balanceAndRandomizeQuestionOptions(
+  questions: any[],
+  opts?: { seed?: number | string; strategy?: 'balanced' | 'random' }
+): any[] {
+  if (!Array.isArray(questions) || questions.length === 0) return [];
+  const rng = createPRNG(opts?.seed);
+
+  const mcqIndices: number[] = [];
+  questions.forEach((q, idx) => {
+    if ((q.type || 'MCQ').toUpperCase() === 'MCQ' && Array.isArray(q.options) && q.options.length >= 2) {
+      mcqIndices.push(idx);
+    }
+  });
+
+  const balancedPositions = generateBalancedPositions(mcqIndices.length, 4, rng);
+
+  return questions.map((q, qIdx) => {
+    if ((q.type || 'MCQ').toUpperCase() !== 'MCQ' || !Array.isArray(q.options) || q.options.length < 2) {
+      return q;
+    }
+
+    const mcqPosIndex = mcqIndices.indexOf(qIdx);
+    const targetSlot = mcqPosIndex >= 0 ? balancedPositions[mcqPosIndex] % q.options.length : Math.floor(rng() * q.options.length);
+
+    // 1. Resolve authoritative correct answer text
+    let correctText = String(q.correct_answer ?? q.correctAnswer ?? '').trim();
+    const rawIdx = parseInt(correctText, 10);
+    if (!isNaN(rawIdx) && rawIdx >= 0 && rawIdx < q.options.length) {
+      correctText = extractOptionText(q.options[rawIdx]);
+    } else {
+      const match = q.options.find(
+        (opt: any) => extractOptionText(opt).toLowerCase() === correctText.toLowerCase()
+      );
+      if (match) {
+        correctText = extractOptionText(match);
+      }
+    }
+
+    // 2. Separate correct option from distractors
+    const distractors: any[] = [];
+    let correctOptObj: any = null;
+
+    for (let i = 0; i < q.options.length; i++) {
+      const opt = q.options[i];
+      const text = extractOptionText(opt);
+      if (text.toLowerCase() === correctText.toLowerCase() && correctOptObj === null) {
+        correctOptObj = opt;
+      } else {
+        distractors.push(opt);
+      }
+    }
+
+    if (!correctOptObj) {
+      correctOptObj = correctText;
+    }
+
+    // 3. Shuffle distractors
+    for (let i = distractors.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [distractors[i], distractors[j]] = [distractors[j], distractors[i]];
+    }
+
+    // 4. Place correct option at targetSlot, distractors in remaining slots
+    const newOptions: any[] = [];
+    let distIdx = 0;
+    for (let i = 0; i < q.options.length; i++) {
+      if (i === targetSlot) {
+        if (typeof correctOptObj === 'object' && correctOptObj !== null) {
+          newOptions.push({ ...correctOptObj, id: String.fromCharCode(65 + i) });
+        } else {
+          newOptions.push(correctText);
+        }
+      } else {
+        const dist = distractors[distIdx++];
+        if (typeof dist === 'object' && dist !== null) {
+          newOptions.push({ ...dist, id: String.fromCharCode(65 + i) });
+        } else {
+          newOptions.push(extractOptionText(dist));
+        }
+      }
+    }
+
+    return {
+      ...q,
+      options: newOptions,
+      correct_answer: correctText,
+      correctAnswer: correctText,
+      correct_answer_index: targetSlot,
+      options_balanced: true,
+    };
+  });
 }
 
 // =========================================================================
@@ -788,6 +1214,23 @@ export async function validateHardenedQuestion(
     }
   }
 
+  // 6b. Semantic Topic Relevance, Tautology & Generic Boilerplate Checks
+  const topicRelevanceResult = checkSemanticTopicRelevance(question, context);
+  if (!topicRelevanceResult.is_relevant) {
+    for (const trIssue of topicRelevanceResult.issues) {
+      errors.push(trIssue);
+      let issueCode: QualityIssueCode = 'GENERIC_FILLER_BOILERPLATE';
+      if (trIssue.includes('Circular') || trIssue.includes('tautology')) {
+        issueCode = 'CIRCULAR_DEFINITION';
+      } else if (trIssue.includes('absurd') || trIssue.includes('guesswork')) {
+        issueCode = 'TRIVIAL_ABSURD_DISTRACTOR';
+      } else if (trIssue.includes('substance') || trIssue.includes('ratio')) {
+        issueCode = 'TOPIC_RELEVANCE_FAILED';
+      }
+      issues.push({ code: issueCode, message: trIssue, severity: 'ERROR', field: 'question' });
+    }
+  }
+
   // 7. Ambiguity Checks
   const ambiguityResult = checkQuestionAmbiguity(question);
   if (ambiguityResult.is_ambiguous) {
@@ -897,6 +1340,7 @@ export async function validateHardenedQuestion(
     ambiguity: ambiguityResult,
     consistency: consistencyResult,
     distractor_quality: distractorResult,
+    topic_relevance: topicRelevanceResult,
     grounding: groundingResult,
     duplicate_check: duplicateResult,
   };
@@ -946,8 +1390,12 @@ export async function validateHardenedQuestionBatch(
     }
   }
 
+  const balanced_valid_questions = balanceAndRandomizeQuestionOptions(valid_questions, {
+    seed: context?.seed,
+  });
+
   return {
-    valid_questions,
+    valid_questions: balanced_valid_questions,
     quarantined_questions,
     results,
   };

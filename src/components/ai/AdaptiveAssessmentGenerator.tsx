@@ -371,13 +371,14 @@ export const AdaptiveAssessmentGenerator: React.FC = () => {
 
   // Client-side subject-faithful diagnostic generator (Used when offline or as instant fallback)
   const generateClientTopicQuestions = (
+    cSubject: string,
     cTopic: string,
     cSubtopic: string,
     cDiff: 'easy' | 'medium' | 'hard',
     cCount: number,
     cType: string
   ): AssessmentQuestion[] => {
-    const norm = (cTopic + ' ' + cSubtopic).toLowerCase();
+    const norm = (cSubject + ' ' + cTopic + ' ' + cSubtopic).toLowerCase();
     let bank: Array<{
       subtopic: string;
       question: string;
@@ -506,119 +507,122 @@ export const AdaptiveAssessmentGenerator: React.FC = () => {
           explanation: `Precision measures the accuracy of positive predictions (of all instances predicted positive, how many were truly positive), whereas Recall measures True Positives / (True Positives + False Negatives).`,
         },
       ];
-    } else if (norm.includes('operating') || norm.includes('os') || norm.includes('kernel') || norm.includes('deadlock') || norm.includes('virtual memory')) {
-      bank = [
-        {
-          subtopic: 'Process Lifecycle & State Transitions',
-          question: `In ${cTopic}, which state transition occurs when an executing process issues an I/O request and must wait for completion?`,
-          options: ['Running to Blocked/Waiting', 'Blocked to Running', 'Ready to Terminated', 'Running to Ready'],
-          correct_answer: 'Running to Blocked/Waiting',
-          explanation: `When an executing process issues a blocking I/O request or system call, it moves from the Running state to the Blocked/Waiting state until the I/O operation completes.`,
-        },
-        {
-          subtopic: 'Deadlock Characterization & Prevention',
-          question: `Which of the following conditions is NOT one of the four essential Coffman conditions required for a deadlock to occur?`,
-          options: ['Preemptive Resource Allocation', 'Mutual Exclusion', 'Hold and Wait', 'Circular Wait'],
-          correct_answer: 'Preemptive Resource Allocation',
-          explanation: `Deadlock requires No Preemption (resources cannot be forcibly taken from a process holding them), along with Mutual Exclusion, Hold and Wait, and Circular Wait.`,
-        },
-        {
-          subtopic: 'Virtual Memory & Address Translation',
-          question: `What is the primary role of the Translation Lookaside Buffer (TLB) in ${cTopic} memory management?`,
-          options: [
-            'To cache recent virtual-to-physical address translations for fast lookup',
-            'To store secondary disk swap partitions for backing storage',
-            'To allocate CPU execution slices to user-level threads',
-            'To encrypt process memory spaces during hardware context switching',
-          ],
-          correct_answer: 'To cache recent virtual-to-physical address translations for fast lookup',
-          explanation: `The TLB is a high-speed associative hardware cache that stores recently used page table mappings to avoid repeated memory access delays.`,
-        },
-        {
-          subtopic: 'CPU Scheduling Algorithms',
-          question: `Which CPU scheduling algorithm provides the theoretical minimum average waiting time for a stationary set of processes?`,
-          options: ['Shortest Job First (SJF)', 'First-Come, First-Served (FCFS)', 'Round Robin (RR)', 'Multilevel Feedback Queue without priority aging'],
-          correct_answer: 'Shortest Job First (SJF)',
-          explanation: `Shortest Job First (SJF) is provably optimal with respect to minimizing average waiting time for a given set of stationary jobs.`,
-        },
-        {
-          subtopic: 'File System Architecture & Inodes',
-          question: `In a standard UNIX file system architecture, which data is stored inside an inode?`,
-          options: [
-            'File metadata, permissions, owner ID, size, and data block pointers (excluding the file name)',
-            'The human-readable file name and its parent directory path only',
-            'The raw unstructured payload bytes stored contiguously on the platter',
-            'The operating system kernel symbol lookup table',
-          ],
-          correct_answer: 'File metadata, permissions, owner ID, size, and data block pointers (excluding the file name)',
-          explanation: `An inode stores all file metadata (file size, permissions, owner, timestamps, and pointers to disk blocks), while the file name is stored separately in the directory table.`,
-        },
-      ];
+    } else if (norm.includes('operating') || norm.includes('os') || norm.includes('kernel') || norm.includes('deadlock') || norm.includes('virtual memory') || norm.includes('synchronization') || norm.includes('concurrency') || norm.includes('semaphore') || norm.includes('mutex')) {
+      if (norm.includes('synchronization') || norm.includes('sync') || norm.includes('mutex') || norm.includes('semaphore') || norm.includes('critical section') || norm.includes('race condition') || norm.includes('monitor') || norm.includes('lock') || norm.includes('concurrency')) {
+        bank = [
+          {
+            subtopic: 'Critical Section Problem',
+            question: 'Which set of three requirements must any valid solution to the critical-section problem strictly satisfy in an operating system?',
+            options: [
+              'Mutual Exclusion, Progress, and Bounded Waiting',
+              'Preemption, Hold-and-Wait, and Starvation',
+              'Mutual Exclusion, Infinite Buffering, and Busy Waiting',
+              'Shortest Job First, Aging, and Context Switching',
+            ],
+            correct_answer: 'Mutual Exclusion, Progress, and Bounded Waiting',
+            explanation: 'Every valid solution to the critical-section problem must guarantee Mutual Exclusion (only one process in the critical section at a time), Progress (processes waiting to enter participate in the decision, not postponed indefinitely), and Bounded Waiting (a bound exists on the number of times others enter before a waiting process is granted access).',
+          },
+          {
+            subtopic: 'Counting vs Binary Semaphores',
+            question: 'In operating systems synchronization, what distinguishes a counting semaphore from a binary semaphore (mutex)?',
+            options: [
+              'A counting semaphore manages an integer value over an unrestricted domain of resource instances, whereas a binary semaphore is strictly constrained to 0 and 1',
+              'A counting semaphore permits multiple threads into the same critical section simultaneously without restriction',
+              'A binary semaphore automatically detects and resolves circular-wait deadlocks at compile time',
+              'A counting semaphore can only be accessed through non-atomic arithmetic increment instructions',
+            ],
+            correct_answer: 'A counting semaphore manages an integer value over an unrestricted domain of resource instances, whereas a binary semaphore is strictly constrained to 0 and 1',
+            explanation: 'Counting semaphores control access to a finite pool of identical resource units using an integer counter. Binary semaphores act strictly as mutex locks with integer values restricted to 0 (locked) and 1 (unlocked).',
+          },
+          {
+            subtopic: 'Race Conditions',
+            question: 'What is the defining characteristic of a race condition in concurrent software systems?',
+            options: [
+              'The final state of shared memory depends non-deterministically on the exact order or timing of thread execution',
+              'Two threads execute on different CPU sockets without accessing any shared memory variables',
+              'A process runs indefinitely in a CPU-bound compute loop without issuing system calls',
+              'The operating system scheduler assigns higher priority to I/O-bound tasks',
+            ],
+            correct_answer: 'The final state of shared memory depends non-deterministically on the exact order or timing of thread execution',
+            explanation: 'A race condition occurs when two or more threads access shared mutable data concurrently, and the final state depends on the unpredictable interleaving or relative execution timing of the threads.',
+          },
+          {
+            subtopic: 'Mutex Locks vs Spinlocks',
+            question: 'Under which operational condition is a spinlock generally preferred over a standard blocking mutex lock?',
+            options: [
+              'On multi-core processors when the expected critical-section duration is shorter than the overhead of two thread context switches',
+              'On single-core uniprocessor systems where threads perform long blocking disk I/O inside the critical section',
+              'Whenever priority inversion must be completely eliminated without operating system kernel intervention',
+              'When memory consumption must be strictly minimized on virtualized network interfaces',
+            ],
+            correct_answer: 'On multi-core processors when the expected critical-section duration is shorter than the overhead of two thread context switches',
+            explanation: 'Spinlocks avoid the high cost of putting a thread to sleep and performing two context switches (sleep and wake). On multi-core systems, busy waiting for a short duration is more efficient than context switching.',
+          },
+          {
+            subtopic: 'Monitors and Condition Variables',
+            question: 'What is the operational function of the wait() operation on a condition variable inside an operating system monitor?',
+            options: [
+              'The invoking thread releases the monitor lock and suspends its execution until another thread signals the condition',
+              'The invoking thread increments an internal integer counter and continues executing inside the monitor',
+              'The invoking thread forcibly aborts all competing threads currently waiting in the entry queue',
+              'The operating system restarts the entire user process from main() with refreshed page tables',
+            ],
+            correct_answer: 'The invoking thread releases the monitor lock and suspends its execution until another thread signals the condition',
+            explanation: 'Condition variables inside monitors provide synchronization without mutual exclusion semantics. Calling wait() atomically releases the monitor mutex and places the calling thread on the condition\'s wait queue until signal() is called.',
+          },
+        ];
+      } else {
+        bank = [
+          {
+            subtopic: 'Process Lifecycle & State Transitions',
+            question: `In ${cTopic}, which state transition occurs when an executing process issues an I/O request and must wait for completion?`,
+            options: ['Running to Blocked/Waiting', 'Blocked to Running', 'Ready to Terminated', 'Running to Ready'],
+            correct_answer: 'Running to Blocked/Waiting',
+            explanation: `When an executing process issues a blocking I/O request or system call, it moves from the Running state to the Blocked/Waiting state until the I/O operation completes.`,
+          },
+          {
+            subtopic: 'Deadlock Characterization & Prevention',
+            question: `Which of the following conditions is NOT one of the four essential Coffman conditions required for a deadlock to occur?`,
+            options: ['Preemptive Resource Allocation', 'Mutual Exclusion', 'Hold and Wait', 'Circular Wait'],
+            correct_answer: 'Preemptive Resource Allocation',
+            explanation: `Deadlock requires No Preemption (resources cannot be forcibly taken from a process holding them), along with Mutual Exclusion, Hold and Wait, and Circular Wait.`,
+          },
+          {
+            subtopic: 'Virtual Memory & Address Translation',
+            question: `What is the primary role of the Translation Lookaside Buffer (TLB) in ${cTopic} memory management?`,
+            options: [
+              'To cache recent virtual-to-physical address translations for fast lookup',
+              'To store secondary disk swap partitions for backing storage',
+              'To allocate CPU execution slices to user-level threads',
+              'To encrypt process memory spaces during hardware context switching',
+            ],
+            correct_answer: 'To cache recent virtual-to-physical address translations for fast lookup',
+            explanation: `The TLB is a high-speed associative hardware cache that stores recently used page table mappings to avoid repeated memory access delays.`,
+          },
+          {
+            subtopic: 'CPU Scheduling Algorithms',
+            question: `Which CPU scheduling algorithm provides the theoretical minimum average waiting time for a stationary set of processes?`,
+            options: ['Shortest Job First (SJF)', 'First-Come, First-Served (FCFS)', 'Round Robin (RR)', 'Multilevel Feedback Queue without priority aging'],
+            correct_answer: 'Shortest Job First (SJF)',
+            explanation: `Shortest Job First (SJF) is provably optimal with respect to minimizing average waiting time for a given set of stationary jobs.`,
+          },
+          {
+            subtopic: 'File System Architecture & Inodes',
+            question: `In a standard UNIX file system architecture, which data is stored inside an inode?`,
+            options: [
+              'File metadata, permissions, owner ID, size, and data block pointers (excluding the file name)',
+              'The human-readable file name and its parent directory path only',
+              'The raw unstructured payload bytes stored contiguously on the platter',
+              'The operating system kernel symbol lookup table',
+            ],
+            correct_answer: 'File metadata, permissions, owner ID, size, and data block pointers (excluding the file name)',
+            explanation: `An inode stores all file metadata (file size, permissions, owner, timestamps, and pointers to disk blocks), while the file name is stored separately in the directory table.`,
+          },
+        ];
+      }
     } else {
-      // General topic-faithful generator (Strictly about cTopic and cSubtopic)
-      const sub = cSubtopic || 'Core Principles';
-      bank = [
-        {
-          subtopic: `${sub} - Conceptual Definition`,
-          question: `Which statement accurately defines the fundamental concept of ${sub} in ${cTopic}?`,
-          options: [
-            `The foundational principles and mechanisms governing ${sub} within ${cTopic}`,
-            `An unrelated secondary hypothesis rejected by standard ${cTopic} theory`,
-            `A transient calculation error that does not reflect verified ${cTopic} models`,
-            `A non-standard convention unsupported by peer-reviewed literature in ${cTopic}`,
-          ],
-          correct_answer: `The foundational principles and mechanisms governing ${sub} within ${cTopic}`,
-          explanation: `Foundational mastery of ${cTopic} requires precise understanding of ${sub} and its governing conceptual framework.`,
-        },
-        {
-          subtopic: `${sub} - Governing Mechanism`,
-          question: `In ${cTopic}, what is the primary role or mechanism of ${sub}?`,
-          options: [
-            `To explain and predict core interactions and structural relationships in ${cTopic}`,
-            `To contradict verified empirical laws and theoretical foundations of ${cTopic}`,
-            `To eliminate quantitative evaluation and replace it with speculative guesswork`,
-            `To prevent systematic analysis of ${cTopic} phenomena`,
-          ],
-          correct_answer: `To explain and predict core interactions and structural relationships in ${cTopic}`,
-          explanation: `Within ${cTopic}, ${sub} provides the theoretical framework for analyzing and resolving domain-specific problems.`,
-        },
-        {
-          subtopic: `${sub} - Practical Application`,
-          question: `When applying ${sub} to solve practical problems in ${cTopic}, which approach is methodologically sound?`,
-          options: [
-            `Systematically applying foundational formulas, theorems, and definitions established in ${cTopic}`,
-            `Relying on arbitrary heuristics without verifying prerequisite constraints in ${cTopic}`,
-            `Ignoring boundary constraints and fundamental definitions of ${sub}`,
-            `Assuming all problems in ${cTopic} have identical trivial solutions`,
-          ],
-          correct_answer: `Systematically applying foundational formulas, theorems, and definitions established in ${cTopic}`,
-          explanation: `Rigorous problem solving in ${cTopic} demands systematic adherence to proven formulas, definitions, and theorems.`,
-        },
-        {
-          subtopic: `${sub} - Comparative Evaluation`,
-          question: `When comparing different models or techniques in ${cTopic} (${sub}), what is the primary distinguishing criterion?`,
-          options: [
-            `The validity of underlying assumptions, domain applicability, and accuracy of results in ${cTopic}`,
-            `Whichever approach has the shortest textual name regardless of theoretical accuracy`,
-            `Discarding mathematical consistency whenever calculations become complex`,
-            `Assuming all methodologies produce identical outcomes regardless of inputs`,
-          ],
-          correct_answer: `The validity of underlying assumptions, domain applicability, and accuracy of results in ${cTopic}`,
-          explanation: `Evaluating models in ${cTopic} requires examining underlying assumptions, boundaries, and predictive validity.`,
-        },
-        {
-          subtopic: `${sub} - Conceptual Misconceptions`,
-          question: `What is a common conceptual misconception that students must avoid when studying ${sub} in ${cTopic}?`,
-          options: [
-            `Confusing surface-level terminology with deep structural mechanisms and mathematical definitions in ${cTopic}`,
-            `Verifying every derivation against foundational principles of ${cTopic}`,
-            `Practicing active problem solving and quantitative reasoning in ${cTopic}`,
-            `Consulting authoritative textbooks and verified course materials`,
-          ],
-          correct_answer: `Confusing surface-level terminology with deep structural mechanisms and mathematical definitions in ${cTopic}`,
-          explanation: `Deep conceptual understanding in ${cTopic} requires distinguishing superficial terminology from underlying mechanisms and definitions.`,
-        },
-      ];
+      // Fail-closed safe fallback: Never synthesize generic boilerplate phrases or circular definitions!
+      bank = [];
     }
 
     return bank.slice(0, cCount).map((item, idx) => {
@@ -676,17 +680,26 @@ export const AdaptiveAssessmentGenerator: React.FC = () => {
     }
 
     const fallbackQuestions = generateClientTopicQuestions(
+      subject.trim(),
       currentTopic,
       subtopic.trim(),
       difficulty,
       count,
       questionType
     );
-    setActiveQuestions(fallbackQuestions);
-    toast({
-      title: 'Topic Diagnostic Assessment',
-      description: `Generated ${fallbackQuestions.length} diagnostic questions tailored for ${currentTopic}.`,
-    });
+    if (fallbackQuestions.length > 0) {
+      setActiveQuestions(fallbackQuestions);
+      toast({
+        title: 'Topic Diagnostic Assessment',
+        description: `Generated ${fallbackQuestions.length} diagnostic questions tailored for ${currentTopic}.`,
+      });
+    } else {
+      toast({
+        title: 'Questions Unavailable',
+        description: `Could not generate reliable questions for ${subject ? `${subject} → ` : ''}${currentTopic}. Please upload course materials or try a narrower subtopic.`,
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleGenerate = async () => {
@@ -744,6 +757,7 @@ export const AdaptiveAssessmentGenerator: React.FC = () => {
         userId: user?.user_id || user?.id || 'default_user',
         topic: topic.trim(),
         subtopic: subtopic.trim() || undefined,
+        subject: subject.trim() || undefined,
         difficulty,
         count,
         questionType,
@@ -751,19 +765,28 @@ export const AdaptiveAssessmentGenerator: React.FC = () => {
       });
 
       if (!result.questions || result.questions.length === 0) {
-        // Automatically provide a clean topic diagnostic baseline rather than leaving student stranded
         const diagQuestions = generateClientTopicQuestions(
+          subject.trim(),
           topic.trim(),
           subtopic.trim(),
           difficulty,
           count,
           questionType
         );
-        setActiveQuestions(diagQuestions);
-        setGenerationNotice(null);
+        if (diagQuestions.length > 0) {
+          setActiveQuestions(diagQuestions);
+          setGenerationNotice(null);
+          toast({
+            title: 'Curriculum Diagnostic Assessment',
+            description: `No local materials uploaded for this topic. Generated ${diagQuestions.length} curriculum diagnostic questions for ${topic.trim()}.`,
+          });
+          return;
+        }
+
         toast({
-          title: 'Curriculum Diagnostic Assessment',
-          description: `No local materials uploaded for this topic. Generated ${diagQuestions.length} curriculum diagnostic questions for ${topic.trim()}.`,
+          title: 'Assessment Unavailable',
+          description: `Could not generate enough reliable questions for ${subject ? `${subject} → ` : ''}${topic.trim()}. Try adding course notes or retrying with a narrower subtopic.`,
+          variant: 'destructive',
         });
         return;
       }
@@ -775,20 +798,28 @@ export const AdaptiveAssessmentGenerator: React.FC = () => {
         description: `Generated and verified ${result.questions.length} grounded questions for ${topic.trim()}.`,
       });
     } catch (err: any) {
-      // Fallback to topic diagnostic assessment rather than throwing a blocking error
       const diagQuestions = generateClientTopicQuestions(
+        subject.trim(),
         topic.trim(),
         subtopic.trim(),
         difficulty,
         count,
         questionType
       );
-      setActiveQuestions(diagQuestions);
-      setGenerationNotice(null);
-      toast({
-        title: 'Topic Diagnostic Assessment',
-        description: `Generated ${diagQuestions.length} diagnostic questions for ${topic.trim()}.`,
-      });
+      if (diagQuestions.length > 0) {
+        setActiveQuestions(diagQuestions);
+        setGenerationNotice(null);
+        toast({
+          title: 'Topic Diagnostic Assessment',
+          description: `Generated ${diagQuestions.length} diagnostic questions for ${topic.trim()}.`,
+        });
+      } else {
+        toast({
+          title: 'Assessment Generation Failed',
+          description: err.message || `Could not generate reliable questions for ${subject ? `${subject} → ` : ''}${topic.trim()}. Try adding course notes or retrying with a narrower subtopic.`,
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsGenerating(false);
     }
